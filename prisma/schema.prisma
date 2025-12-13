@@ -1,0 +1,214 @@
+// Duo-Nan-Guo Content Factory - Prisma Schema
+// Supports JLPT, TOEIC, TOPIK, HSK exam question types
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS - Target Languages
+// ============================================
+
+enum TargetLanguage {
+  EN // English (TOEIC)
+  JP // Japanese (JLPT)
+  KR // Korean (TOPIK)
+  CN // Chinese (HSK)
+}
+
+// ============================================
+// ENUMS - Exam Question Types
+// ============================================
+
+enum ExamQuestionType {
+  // TOEIC Types (English) - Part 5 Incomplete Sentences
+  toeic_part5_pos       // Part of Speech (詞性判斷)
+  toeic_part5_tense     // Verb Tense (時態與語態)
+  toeic_part5_vocab     // Vocabulary (情境單字)
+  toeic_part5_prep      // Prepositions/Conjunctions (介系詞/連接詞)
+  toeic_part5_pronouns  // Pronouns (代名詞/關係代名詞)
+  toeic_part5_agreement // Subject-Verb Agreement (主詞動詞一致)
+
+  // JLPT Types (Japanese) - Based on official 言語知識（文字・語彙）format
+  jlpt_kanji_reading   // 問題1: 漢字読み - Kanji Reading (全級別)
+  jlpt_kanji_writing   // 問題2: 漢字書き - Kanji Writing (全級別)
+  jlpt_context_vocab   // 問題3: 文脈規定 - Context Vocabulary (全級別)
+  jlpt_paraphrase      // 問題4: 言い換え - Paraphrase (全級別)
+  jlpt_usage           // 問題5: 用法 - Word Usage (N3-N1 only)
+  jlpt_compound        // 問題6: 複合語 - Compound Words (N2-N1 only)
+
+  // TOPIK Types (Korean) - Based on official exam format
+  topik_vocab_context      // 情境詞彙 - Context Vocabulary (TOPIK I main)
+  topik_particles          // 助詞 - Particles (TOPIK I)
+  topik_grammar_blank      // 文法填空 - Grammar Fill-in (TOPIK II Q1-2)
+  topik_synonyms           // 近義詞 - Synonyms/Vocabulary
+  topik_grammar_expression // 文法表現近義詞 - Grammar Expression Synonyms (TOPIK II Q3-4)
+  topik_sentence_order     // 句子排序 - Sentence Ordering
+  topik_content_match      // 內容匹配 - Content Matching
+
+  // HSK Types (Chinese) - HSK 3.0 Format, Output in Traditional Chinese
+  hsk_vocab_blank       // 選詞填空 - Vocabulary Fill-in
+  hsk_grammar_blank     // 語法填空 - Grammar Fill-in
+  hsk_synonyms          // 近義詞 - Synonyms
+  hsk_sentence_order    // 句子排序 - Sentence Ordering
+  hsk_measure_words     // 量詞 - Measure Words
+  hsk_word_order        // 語序 - Word Order/Syntax
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Question {
+  id               String           @id @default(auto()) @map("_id") @db.ObjectId
+  targetLanguage   TargetLanguage
+  rank             Int              // 1-6 Unified Rank System
+  examQuestionType ExamQuestionType
+  topic            String?          // Optional topic/context (e.g., "Business Meeting")
+
+  // Question Content (T2T Mode - Target-to-Target)
+  stimulus     String // Question text in target language
+  interaction  Json   // Flexible structure for options { a: "...", b: "...", c: "...", d: "..." }
+  correctAnswer String // The correct option key (a, b, c, or d)
+  explanation  String? // Optional explanation for the answer
+
+  // AI Quality Metrics
+  criticScore    Float?  // 0-100 score from Critic model
+  criticFeedback String? // Feedback from Critic model
+  generationBatch String? // Batch ID for grouping generated questions
+  
+  // Human Override Protection
+  isHumanTouched Boolean @default(false) // Prevents AI from overwriting human edits
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes for efficient querying
+  @@index([targetLanguage, rank])
+  @@index([examQuestionType])
+  @@index([generationBatch])
+  @@index([isHumanTouched])
+}
+
+// ============================================
+// ENUMS - Match System
+// ============================================
+
+enum MatchMode {
+  duel        // 1v1
+  multiplayer // 2-8 players
+}
+
+enum MatchStatus {
+  waiting   // Waiting for players
+  playing   // In progress
+  finished  // Completed
+  cancelled // Cancelled
+}
+
+// ============================================
+// MODELS - User & Auth
+// ============================================
+
+model User {
+  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Identity (OAuth or Bot)
+  provider    String     // "google" | "discord" | "llm_bot"
+  providerId  String     // Provider's user ID or Bot unique ID
+  email       String?    @unique
+  name        String?
+  avatar      String?
+  
+  // Bot-specific fields
+  isBot       Boolean    @default(false)
+  botModel    String?    // e.g., "gemini-2.5-flash", "gpt-4o"
+  
+  // Denormalized stats (updated after each match)
+  stats       UserStats?
+  
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  
+  @@unique([provider, providerId])
+  @@index([isBot])
+}
+
+type UserStats {
+  totalMatches   Int   @default(0)
+  wins           Int   @default(0)
+  correctRate    Float @default(0)
+}
+
+// ============================================
+// MODELS - Match System
+// ============================================
+
+model Match {
+  id              String         @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // Configuration
+  mode            MatchMode
+  targetLanguage  TargetLanguage
+  rank            Int
+  questionCount   Int
+  timePerQuestion Int            // seconds
+  
+  // Participants (embedded)
+  players         MatchPlayer[]
+  
+  // Questions used (references)
+  questionIds     String[]       @db.ObjectId
+  
+  // State
+  status          MatchStatus    @default(waiting)
+  winnerId        String?        @db.ObjectId
+  
+  // Timestamps
+  startedAt       DateTime?
+  endedAt         DateTime?
+  createdAt       DateTime       @default(now())
+  
+  @@index([status, createdAt])
+  @@index([createdAt])
+}
+
+type MatchPlayer {
+  userId        String?  @db.ObjectId  // User ID (null for rule bots only)
+  playerId      String                 // Unique ID within this match
+  name          String
+  avatar        String?
+  isBot         Boolean  @default(false)
+  botType       String?                // "rule" | "llm" (null for humans)
+  finalScore    Int      @default(0)
+}
+
+// ============================================
+// MODELS - Analytics
+// ============================================
+
+model AnswerRecord {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  
+  // References
+  userId         String?  @db.ObjectId  // null = rule bot (not tracked)
+  matchId        String   @db.ObjectId
+  questionId     String   @db.ObjectId
+  
+  // Answer data
+  answer         String                 // a, b, c, d
+  isCorrect      Boolean
+  responseTimeMs Int                    // milliseconds
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([questionId])
+  @@index([userId, isCorrect])
+  @@index([matchId])
+}
