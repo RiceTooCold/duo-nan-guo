@@ -1,0 +1,35 @@
+# CODEOWNERS
+# 此檔案定義程式碼擁有權，PR 會自動指派 Reviewer
+# 格式: 路徑 @github-username
+
+# ============================================
+# Question Factory - 題目工廠負責人
+# ============================================
+/lib/factory/                @RiceTooCold
+/lib/config/factory.ts       @RiceTooCold
+/app/admin/                  @RiceTooCold
+/app/api/generate/           @RiceTooCold
+/app/api/questions/          @RiceTooCold
+/app/api/banks/              @RiceTooCold
+
+# ============================================
+# Game Engine - 遊戲對戰負責人
+# ============================================
+/lib/game/                   @game-owner
+/lib/config/game.ts          @game-owner
+/app/(game)/                 @game-owner
+/app/api/match/              @game-owner
+
+# ============================================
+# UI/UX - 設計與前端負責人
+# ============================================
+/lib/ui/                     @ui-owner
+/app/globals.css             @ui-owner
+/public/                     @ui-owner
+
+# ============================================
+# Shared - 共同維護
+# ============================================
+/prisma/                     @RiceTooCold @game-owner
+/lib/prisma.ts               @RiceTooCold @game-owner
+/docs/                       @RiceTooCold @game-owner @ui-owner

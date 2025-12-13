@@ -24,7 +24,13 @@
     ],
     "paths": {
       "@/*": [
-        "./src/*"
+        "./*"
+      ],
+      "@duo-nan-guo/shared-types": [
+        "./packages/shared-types/src"
+      ],
+      "@duo-nan-guo/question-factory": [
+        "./packages/question-factory/src"
       ]
     }
   },
@@ -37,6 +43,7 @@
     "**/*.mts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "packages"
   ]
 }

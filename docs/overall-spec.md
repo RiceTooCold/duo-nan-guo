@@ -89,18 +89,37 @@ Candidates preparing for language proficiency exams who prefer gamified practice
 | Auth | NextAuth.js (Google, Discord) |
 | Platform | Mobile-first PWA |
 
-### 4.2 Monorepo Structure
+### 4.2 Project Structure
 
 ```
 duo-nan-guo/
-├── apps/web/                  # Next.js main application
-├── packages/
-│   ├── ui/                    # UI components
-│   ├── game-engine/           # Battle logic
-│   ├── question-factory/      # Question generation
-│   └── shared-types/          # Shared TypeScript types
+├── app/                       # Next.js App Router
+│   ├── admin/                # Admin dashboard (Factory)
+│   ├── (game)/               # Game pages (Game Engine + UI)
+│   └── api/                  # API routes
+├── lib/
+│   ├── factory/              # Question generation logic
+│   │   ├── ai/              # Gemini, prompts, critic
+│   │   └── services/        # Generator, question service
+│   ├── game/                 # Battle logic (future)
+│   ├── config/               # Shared configuration
+│   ├── utils/                # Rate limiter, helpers
+│   └── prisma.ts             # Database client
+├── contexts/                  # React contexts
+├── prisma/                    # Database schema
 └── docs/                      # Specifications
 ```
+
+### 4.3 Code Ownership
+
+Team ownership is defined in `.github/CODEOWNERS`:
+
+| Area | Owner | Paths |
+|------|-------|-------|
+| Question Factory | Factory Engineer | `/lib/factory/`, `/app/admin/` |
+| Game Engine | Game Engineer | `/lib/game/`, `/app/(game)/` |
+| UI/UX | UI Designer | `/lib/ui/`, `/app/globals.css` |
+| Shared | All | `/prisma/`, `/docs/` |
 
 ---
 
