@@ -1,36 +1,127 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Duo-Nan-Guo 多難過
 
-## Getting Started
+> 語言檢定考試對戰應用 — 結合 Kahoot 式即時對戰與 JLPT / TOEIC / TOPIK / HSK 官方題型
 
-First, run the development server:
+[![Next.js](https://img.shields.io/badge/Next.js-15-black?logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?logo=typescript)](https://www.typescriptlang.org/)
+[![Prisma](https://img.shields.io/badge/Prisma-6-2D3748?logo=prisma)](https://www.prisma.io/)
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+---
+
+## 專案概述
+
+**Duo-Nan-Guo** 是一款語言檢定考試對戰 PWA 應用，玩家可透過 1v1 或多人對戰模式練習語言考試題目，支援：
+
+| 考試類型 | 語言 |
+|----------|------|
+| JLPT N1-N5 | 日語 |
+| TOEIC | 英語 |
+| TOPIK I-II | 韓語 |
+| HSK 1-6 | 中文 |
+
+### 核心特色
+
+- **T2T 沉浸式學習**：目標語言對目標語言，無母語提示
+- **即時對戰**：1v1 對決 + 2-8 人多人模式
+- **AI 對手**：規則 Bot 與 LLM Bot 雙模式
+- **AI 題目工廠**：Gemini 驅動的 Generator-Critic 生成管線
+
+---
+
+## 技術架構
+
+```
+duo-nan-guo/
+├── app/                    # Next.js App Router
+│   ├── admin/             # 題目管理後台
+│   ├── (game)/            # 遊戲頁面
+│   └── api/               # API Routes
+├── lib/
+│   ├── factory/           # 題目生成邏輯
+│   └── game/              # 對戰引擎 (開發中)
+├── prisma/                # Database Schema
+└── docs/                  # 專案文件
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+| 層級 | 技術選擇 |
+|------|----------|
+| Framework | Next.js 15 (App Router) |
+| Database | MongoDB Atlas + Prisma |
+| AI | Google Gemini 2.5 Flash/Pro |
+| Realtime | Socket.io (規劃中) |
+| Auth | NextAuth.js (規劃中) |
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+---
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 快速開始
 
-## Learn More
+### 環境需求
 
-To learn more about Next.js, take a look at the following resources:
+- Node.js 20+
+- pnpm 9+
+- MongoDB Atlas 帳號
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 安裝步驟
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+# 1. Clone 專案
+git clone https://github.com/your-org/duo-nan-guo.git
+cd duo-nan-guo
 
-## Deploy on Vercel
+# 2. 安裝依賴
+pnpm install
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+# 3. 設定環境變數
+cp .env.example .env
+# 填入 DATABASE_URL 和 GEMINI_API_KEY
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+# 4. 生成 Prisma Client
+pnpm db:generate
+
+# 5. 推送 Schema 到資料庫
+pnpm db:push
+
+# 6. 啟動開發伺服器
+pnpm dev
+```
+
+開啟 [http://localhost:3000](http://localhost:3000) 即可使用。
+
+---
+
+## 可用指令
+
+| 指令 | 說明 |
+|------|------|
+| `pnpm dev` | 啟動開發伺服器 |
+| `pnpm build` | 建置生產版本 |
+| `pnpm lint` | 執行 ESLint |
+| `pnpm db:generate` | 生成 Prisma Client |
+| `pnpm db:push` | 推送 Schema 到資料庫 |
+| `pnpm db:studio` | 開啟 Prisma Studio |
+
+---
+
+## 團隊分工
+
+| 角色 | 負責範圍 |
+|------|----------|
+| **Factory Engineer** | 題目生成、Admin Dashboard |
+| **Game Engineer** | 對戰引擎、Bot 實作 |
+| **UI/UX Designer** | 設計系統、遊戲介面 |
+
+詳見 [協作規範](./docs/collaboration-and-gitflow.md)
+
+---
+
+## 文件
+
+- [整體規格書](./docs/overall-spec.md)
+- [題目工廠規格](./docs/factory/Duo-Nan-Guo%20Factory%20Specification.md)
+- [協作與 Git Flow](./docs/collaboration-and-gitflow.md)
+
+---
+
+## License
+
+MIT © 2025 Duo-Nan-Guo Team
