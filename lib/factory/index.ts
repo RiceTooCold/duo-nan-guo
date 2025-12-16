@@ -7,6 +7,6 @@ export * from './ai/prompts';
 export * from './ai/shared-context';
 
 // Services
-export * from './services/generator';
+export * from './ai/role/generator';
 export * from './ai/role/critic';
 export * from './services/question';
