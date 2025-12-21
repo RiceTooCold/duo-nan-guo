@@ -15,50 +15,36 @@ const languages = [
 
 const questionCounts = [5, 10, 20]
 
-export function RoomSetupScreen() {
+export function RoomSetupScreen({
+  onComplete
+}: {
+  onComplete?: (settings: { lang: string; level: string; count: number; mode: 'bot' | 'player' }) => void
+}) {
   const [selectedLanguage, setSelectedLanguage] = useState<string | null>(null)
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null)
   const [selectedCount, setSelectedCount] = useState(10)
   const [opponent, setOpponent] = useState<'bot' | 'player'>('bot')
-  const [isCountdown, setIsCountdown] = useState(false)
-  const [countdownNumber, setCountdownNumber] = useState(3)
 
   const selectedLangData = languages.find(l => l.id === selectedLanguage)
 
   const handleStartBattle = () => {
-    setIsCountdown(true)
-    
-    // Countdown animation
-    let count = 3
-    const interval = setInterval(() => {
-      count--
-      setCountdownNumber(count)
-      
-      if (count === 0) {
-        clearInterval(interval)
-        setTimeout(() => {
-          // Pass settings to battle page via URL params
-          const params = new URLSearchParams({
-            lang: selectedLanguage || 'ko',
-            level: selectedLevel || '1級',
-            count: selectedCount.toString(),
-          })
-          window.location.href = `/battle?${params.toString()}`
-        }, 500)
-      }
-    }, 1000)
+    if (onComplete && selectedLanguage && selectedLevel) {
+      onComplete({
+        lang: selectedLanguage,
+        level: selectedLevel,
+        count: selectedCount,
+        mode: opponent
+      })
+    }
   }
 
   const isReady = selectedLanguage && selectedLevel && selectedCount
 
   return (
     <div className="min-h-dvh flex flex-col bg-[#F5F8FC] relative">
-      {/* Countdown Overlay */}
-      <CountdownOverlay isVisible={isCountdown} number={countdownNumber} />
-
       {/* Header */}
       <header className="px-4 py-4 border-b-2 border-[#D5E3F7] flex items-center gap-4 bg-white">
-        <Link 
+        <Link
           href="/profile"
           className="p-2 -ml-2 rounded-full hover:bg-[#D5E3F7] transition-colors"
         >
@@ -79,11 +65,10 @@ export function RoomSetupScreen() {
                   setSelectedLanguage(lang.id)
                   setSelectedLevel(null)
                 }}
-                className={`p-4 rounded-2xl border-2 transition-all ${
-                  selectedLanguage === lang.id
-                    ? 'border-[#5B8BD4] bg-[#D5E3F7]'
-                    : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
-                }`}
+                className={`p-4 rounded-2xl border-2 transition-all ${selectedLanguage === lang.id
+                  ? 'border-[#5B8BD4] bg-[#D5E3F7]'
+                  : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
+                  }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -109,11 +94,10 @@ export function RoomSetupScreen() {
                 <motion.button
                   key={level}
                   onClick={() => setSelectedLevel(level)}
-                  className={`px-4 py-2 rounded-xl font-medium transition-all ${
-                    selectedLevel === level
-                      ? 'bg-[#5B8BD4] text-white'
-                      : 'bg-white border-2 border-[#D5E3F7] text-[#333] hover:bg-[#D5E3F7]'
-                  }`}
+                  className={`px-4 py-2 rounded-xl font-medium transition-all ${selectedLevel === level
+                    ? 'bg-[#5B8BD4] text-white'
+                    : 'bg-white border-2 border-[#D5E3F7] text-[#333] hover:bg-[#D5E3F7]'
+                    }`}
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                 >
@@ -132,11 +116,10 @@ export function RoomSetupScreen() {
               <motion.button
                 key={count}
                 onClick={() => setSelectedCount(count)}
-                className={`flex-1 py-3 rounded-xl font-bold text-lg transition-all ${
-                  selectedCount === count
-                    ? 'bg-[#5B8BD4] text-white'
-                    : 'bg-white border-2 border-[#D5E3F7] text-[#333] hover:bg-[#D5E3F7]'
-                }`}
+                className={`flex-1 py-3 rounded-xl font-bold text-lg transition-all ${selectedCount === count
+                  ? 'bg-[#5B8BD4] text-white'
+                  : 'bg-white border-2 border-[#D5E3F7] text-[#333] hover:bg-[#D5E3F7]'
+                  }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
@@ -152,11 +135,10 @@ export function RoomSetupScreen() {
           <div className="flex gap-3">
             <motion.button
               onClick={() => setOpponent('bot')}
-              className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                opponent === 'bot'
-                  ? 'border-[#5B8BD4] bg-[#D5E3F7]'
-                  : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
-              }`}
+              className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${opponent === 'bot'
+                ? 'border-[#5B8BD4] bg-[#D5E3F7]'
+                : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
+                }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -166,11 +148,10 @@ export function RoomSetupScreen() {
             </motion.button>
             <motion.button
               onClick={() => setOpponent('player')}
-              className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                opponent === 'player'
-                  ? 'border-[#5B8BD4] bg-[#D5E3F7]'
-                  : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
-              }`}
+              className={`flex-1 p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${opponent === 'player'
+                ? 'border-[#5B8BD4] bg-[#D5E3F7]'
+                : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
+                }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
             >
@@ -211,11 +192,10 @@ export function RoomSetupScreen() {
         <motion.button
           onClick={handleStartBattle}
           disabled={!isReady}
-          className={`w-full py-4 text-lg font-semibold rounded-2xl transition-all ${
-            isReady 
-              ? 'bg-[#5B8BD4] text-white' 
-              : 'bg-[#D5E3F7] text-[#64748b] cursor-not-allowed'
-          }`}
+          className={`w-full py-4 text-lg font-semibold rounded-2xl transition-all ${isReady
+            ? 'bg-[#5B8BD4] text-white'
+            : 'bg-[#D5E3F7] text-[#64748b] cursor-not-allowed'
+            }`}
           style={{ boxShadow: isReady ? '0 10px 25px -5px rgba(91, 139, 212, 0.4)' : 'none' }}
           whileHover={isReady ? { scale: 1.02, backgroundColor: '#4A7BC4' } : {}}
           whileTap={isReady ? { scale: 0.98 } : {}}
