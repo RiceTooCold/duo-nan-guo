@@ -20,15 +20,16 @@ interface WaitingRoomScreenProps {
     level: string
     count: number
     mode: 'bot' | 'player'
-    onStart: () => void
+    onStart: () => Promise<void>  // Now async to allow match creation
+    onCancel?: () => void  // 取消回到設定
 }
 
 const TAUNTS = ['😂', '😎', '🔥', '💩', '😠', '🙏']
 
-export function WaitingRoomScreen({ language, level, count, mode, onStart }: WaitingRoomScreenProps) {
+export function WaitingRoomScreen({ language, level, count, mode, onStart, onCancel }: WaitingRoomScreenProps) {
     const [status, setStatus] = useState<'searching' | 'waiting' | 'starting'>('searching')
     const [players, setPlayers] = useState<Player[]>([
-        { id: 'me', name: '你 (Player)', avatar: '/mascot-parrot.png', fallback: '🦜', isReady: false }
+        { id: 'me', name: '你 (Player)', avatar: '/mascot-parrot.jpg', fallback: '🦜', isReady: false }
     ])
     const [countdown, setCountdown] = useState(5)
     const [showCountdown, setShowCountdown] = useState(false)
@@ -40,7 +41,7 @@ export function WaitingRoomScreen({ language, level, count, mode, onStart }: Wai
         if (status === 'searching') {
             const timer = setTimeout(() => {
                 const opponent: Player = mode === 'bot'
-                    ? { id: 'bot', name: 'RiceBot', avatar: '/mascot-robot.png', fallback: '🤖', isReady: true }
+                    ? { id: 'bot', name: 'RiceBot', avatar: '/mascot-robot.jpg', fallback: '🤖', isReady: true }
                     : { id: 'other', name: '對手玩家', avatar: '', fallback: '👤', isReady: false }
 
                 setPlayers(prev => [...prev, opponent])
@@ -92,11 +93,11 @@ export function WaitingRoomScreen({ language, level, count, mode, onStart }: Wai
                     clearInterval(interval)
                     if (!hasStartedRef.current) {
                         hasStartedRef.current = true
-                        console.log('🚀 Final call to onStart')
-                        // No delay, or very short delay
-                        setTimeout(() => {
-                            onStart()
-                        }, 500)
+                        console.log('🚀 Final call to onStart (async)')
+                            // Await the async onStart (match creation + navigation)
+                            ; (async () => {
+                                await onStart()
+                            })()
                     }
                 }
             }, 1000)
@@ -306,6 +307,15 @@ export function WaitingRoomScreen({ language, level, count, mode, onStart }: Wai
                             animate={{ opacity: 1 }}
                             className="flex gap-4"
                         >
+                            {/* Cancel Button */}
+                            {onCancel && (
+                                <button
+                                    onClick={onCancel}
+                                    className="px-6 py-4 text-lg font-black rounded-2xl bg-white border-2 border-[#D5E3F7] text-[#64748b] hover:bg-[#D5E3F7] transition-all"
+                                >
+                                    取消
+                                </button>
+                            )}
                             <button
                                 onClick={toggleReady}
                                 disabled={status === 'searching'}

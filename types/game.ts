@@ -2,7 +2,7 @@ import type { TargetLanguage, MatchPlayer } from '@/generated/prisma';
 
 export enum GamePhase {
   IDLE = 'IDLE',
-  COUNTDOWN = 'COUNTDOWN',
+  READY = 'READY',         // 資料就緒，等待開始 (用於 Intro/Reveal/NextRound)
   PLAYING = 'PLAYING',
   RESOLVING = 'RESOLVING',
   FINISHED = 'FINISHED',
@@ -17,6 +17,7 @@ export interface ClientQuestion {
 export interface GameSession {
   matchId: string;
   questions: ClientQuestion[];
+  correctAnswerHashes: Record<string, string>; // questionId -> hash for frontend validation
   players: MatchPlayer[];
   targetLanguage: TargetLanguage;
   rank: number;
@@ -26,7 +27,6 @@ export interface AnswerResult {
   isCorrect: boolean;
   correctAnswer: string;
   newScore: number;
-  newHealth: number;
   isGameOver: boolean;
 }
 
@@ -34,8 +34,8 @@ export interface PlayerState {
   id: string;
   name: string;
   score: number;
-  health: number;
   streak: number;
+  maxStreak: number; // Highest streak achieved during the game
   isBot: boolean;
   avatar?: string | null;
 }
@@ -45,12 +45,15 @@ export interface GameState {
   currentQuestionIndex: number;
   timeLeft: number;
   session: GameSession | null;
-  players: Record<string, PlayerState>; // playerId -> PlayerState
+  // Self vs Opponent structure
+  self: PlayerState | null;
+  opponent: PlayerState | null;
   winnerId: string | null;
-  lastResult: AnswerResult | null; // For immediate feedback
+  lastResult: AnswerResult | null;
   error: string | null;
-  // UI State fields
+  // Answer tracking
   correctAnswer: string | null;
-  playerAnswer: string | null;
-  botAnswer: string | null;
+  selfAnswer: string | null;
+  opponentAnswer: string | null;
+  // selfAnswered and opponentAnswered are removed - derive from answer != null
 }

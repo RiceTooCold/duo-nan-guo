@@ -11,13 +11,13 @@ interface OptionCardProps {
   onClick: () => void
 }
 
-export function OptionCard({ 
-  id, 
-  text, 
-  state, 
-  disabled, 
-  index, 
-  onClick 
+export function OptionCard({
+  id,
+  text,
+  state,
+  disabled,
+  index,
+  onClick
 }: OptionCardProps) {
   const stateClasses = {
     default: '',
@@ -30,14 +30,14 @@ export function OptionCard({
     <motion.button
       onClick={onClick}
       disabled={disabled}
-      className={`game-option-card min-h-[80px] ${stateClasses[state]}`}
+      className={`game-option-card min-h-[50px] ${stateClasses[state]} w-full flex items-center justify-between`}
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.1 }}
       whileTap={{ scale: 0.95 }}
     >
-      <span className="text-xl font-bold text-[#5B8BD4]">{id}</span>
-      <span className="text-sm font-medium flex-1 text-left text-[#333]">{text}</span>
+      <span className="text-xl font-bold text-[#5B8BD4]">{`(${id.toUpperCase()})`}</span>
+      <span className="text-lg font-medium flex-1 text-left text-[#333]">{text}</span>
     </motion.button>
   )
 }

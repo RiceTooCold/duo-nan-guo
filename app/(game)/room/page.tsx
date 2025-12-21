@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, Users, Bot } from 'lucide-react'
 import { WaitingRoomScreen } from '@/components/game/WaitingRoomScreen'
+import { createMatch } from '@/actions/game.server'
 import { gameLanguages, questionCounts, levelToRank, type GameLanguageConfig } from '@/lib/config/game'
 import type { TargetLanguage } from '@/generated/prisma'
 
@@ -32,18 +33,27 @@ export default function RoomPage() {
     }
   }
 
-  // When WaitingRoom countdown completes, navigate to battle
-  const handleWaitingComplete = () => {
-    if (selectedLanguage && selectedLevel) {
-      // Convert level label to rank number for backend
+  // When WaitingRoom countdown completes: create match then navigate
+  const handleWaitingComplete = async () => {
+    if (!selectedLanguage || !selectedLevel) return
+
+    try {
+      // Convert level label to rank number
       const rank = levelToRank(selectedLanguage.id, selectedLevel)
-      const params = new URLSearchParams({
-        lang: selectedLanguage.id,
-        rank: rank.toString(),
-        count: selectedCount.toString(),
-        mode: opponent
+
+      // Create match on server
+      const { matchId } = await createMatch(null, {
+        lang: selectedLanguage.id as TargetLanguage,
+        rank,
+        count: selectedCount,
       })
-      router.push(`/battle?${params.toString()}`)
+
+      // Navigate to battle with matchId
+      router.push(`/battle?matchId=${matchId}`)
+    } catch (err) {
+      console.error('Failed to create match:', err)
+      // Optionally show error and go back to setup
+      setRoomPhase('setup')
     }
   }
 
@@ -56,6 +66,7 @@ export default function RoomPage() {
         count={selectedCount}
         mode={opponent}
         onStart={handleWaitingComplete}
+        onCancel={() => setRoomPhase('setup')}
       />
     )
   }

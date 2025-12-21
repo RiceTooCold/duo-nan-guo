@@ -1,206 +1,215 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { startGame, submitAnswer } from '@/actions/game.server';
-import { GamePhase, type GameState, type GameSession, type PlayerState } from '@/types/game';
-import type { TargetLanguage } from '@/generated/prisma';
+import { useEffect, useCallback, useRef, useReducer } from 'react';
+import { getMatch, submitAllAnswers } from '@/actions/game.server';
+import { GamePhase } from '@/types/game';
+import { gameReducer, initialGameState, hashAnswer, validateAnswerPure } from './gameReducer';
+
+export interface AnswerEntry {
+    questionId: string;
+    answer: string;
+    responseTimeMs: number;
+    isCorrect: boolean;
+    playerId: 'self' | 'opponent';
+}
 
 export function useGameLoop() {
-    const [state, setState] = useState<GameState>({
-        phase: GamePhase.IDLE,
-        currentQuestionIndex: 0,
-        timeLeft: 15,
-        session: null,
-        players: {},
-        winnerId: null,
-        lastResult: null,
-        error: null,
-        correctAnswer: null,
-        playerAnswer: null,
-        botAnswer: null,
-    });
+    const [state, dispatch] = useReducer(gameReducer, initialGameState);
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
+    const questionStartTimeRef = useRef<number>(Date.now());
+    const answersBufferRef = useRef<AnswerEntry[]>([]);
+    const initializingRef = useRef<boolean>(false);
+    const initializedMatchIdRef = useRef<string | null>(null);
+
+    // Derived states (for UI convenience)
+    const selfAnswered = state.selfAnswer !== null;
+    const opponentAnswered = state.opponentAnswer !== null;
 
     // Initialize game session
-    const initGame = useCallback(async (userId: string | null, config: { lang: TargetLanguage, rank: number }) => {
+    const initGame = useCallback(async (matchId: string) => {
+        if (initializingRef.current) return;
+        if (initializedMatchIdRef.current === matchId) return;
+
         try {
-            setState((prev: GameState) => ({ ...prev, phase: GamePhase.IDLE, error: null }));
-            const session = await startGame(userId, config);
+            initializingRef.current = true;
+            answersBufferRef.current = [];
 
-            const initialPlayers: Record<string, PlayerState> = {};
-            session.players.forEach((p: any) => {
-                initialPlayers[p.playerId] = {
-                    id: p.playerId,
-                    name: p.name,
-                    score: 0,
-                    health: 100,
-                    streak: 0,
-                    isBot: p.isBot,
-                    avatar: p.avatar,
-                };
+            const result = await getMatch(matchId);
+
+            if ('error' in result) {
+                dispatch({ type: 'SET_ERROR', payload: result.error });
+                return;
+            }
+
+            const session = result;
+
+            if (initializedMatchIdRef.current && initializedMatchIdRef.current !== matchId) {
+                initializingRef.current = false;
+                return;
+            }
+
+            initializedMatchIdRef.current = matchId;
+
+            const selfPlayer = session.players.find(p => !p.isBot);
+            const opponentPlayer = session.players.find(p => p.isBot) ||
+                session.players.find(p => p.playerId !== selfPlayer?.playerId);
+
+            dispatch({
+                type: 'INIT_GAME',
+                payload: {
+                    session,
+                    self: {
+                        id: selfPlayer?.playerId || 'self',
+                        name: selfPlayer?.name || 'You',
+                        score: 0,
+                        streak: 0,
+                        maxStreak: 0,
+                        isBot: false,
+                        avatar: selfPlayer?.avatar,
+                    },
+                    opponent: {
+                        id: opponentPlayer?.playerId || 'opponent',
+                        name: opponentPlayer?.name || 'Opponent',
+                        score: 0,
+                        streak: 0,
+                        maxStreak: 0,
+                        isBot: opponentPlayer?.isBot || false,
+                        avatar: opponentPlayer?.avatar,
+                    }
+                }
             });
-
-            setState((prev: GameState) => ({
-                ...prev,
-                session,
-                players: initialPlayers,
-                phase: GamePhase.COUNTDOWN,
-                timeLeft: 3,
-            }));
         } catch (err: any) {
-            setState((prev: GameState) => ({ ...prev, error: err.message || 'Failed to start game' }));
+            dispatch({ type: 'SET_ERROR', payload: err.message || 'Failed to load game' });
+        } finally {
+            initializingRef.current = false;
         }
     }, []);
 
-    // Handle countdown to playing
+    const startRound = useCallback(() => {
+        dispatch({ type: 'START_ROUND' });
+        questionStartTimeRef.current = Date.now();
+    }, []);
+
+    // Timer Effect - Only manages the interval, reducer handles logic
     useEffect(() => {
-        if (state.phase === GamePhase.COUNTDOWN) {
-            if (state.timeLeft > 0) {
-                const timer = setTimeout(() => {
-                    setState((prev: GameState) => ({ ...prev, timeLeft: prev.timeLeft - 1 }));
-                }, 1000);
-                return () => clearTimeout(timer);
-            } else {
-                setState((prev: GameState) => ({ ...prev, phase: GamePhase.PLAYING, timeLeft: 15 }));
-            }
-        }
-    }, [state.phase, state.timeLeft]);
-
-    // Handle playing timer
-    useEffect(() => {
-        if (state.phase === GamePhase.PLAYING) {
-            if (state.timeLeft > 0) {
-                timerRef.current = setInterval(() => {
-                    setState((prev: GameState) => ({ ...prev, timeLeft: prev.timeLeft - 1 }));
-                }, 1000);
-                return () => {
-                    if (timerRef.current) clearInterval(timerRef.current);
-                };
-            } else {
-                // Time's up - auto fail for player
-                handleAnswer('');
-            }
-        }
-    }, [state.phase, state.timeLeft]);
-
-    // Handle Answer Submission (Common logic for both Human and Bot)
-    const processAnswer = async (playerId: string, answer: string) => {
-        if (!state.session) return;
-
-        const questionId = state.session.questions[state.currentQuestionIndex].id;
-        const userId = state.session.players.find(p => p.playerId === playerId)?.userId || null;
-
-        try {
-            const result = await submitAnswer(state.session.matchId, questionId, answer, userId);
-
-            setState((prev: GameState) => {
-                const player = prev.players[playerId];
-                const newScore = player.score + (result?.newScore || 0);
-                const newHealth = Math.max(0, player.health + (result?.newHealth || 0));
-                const newStreak = result?.isCorrect ? player.streak + 1 : 0;
-
-                return {
-                    ...prev,
-                    lastResult: result,
-                    players: {
-                        ...prev.players,
-                        [playerId]: {
-                            ...player,
-                            score: newScore,
-                            health: newHealth,
-                            streak: newStreak,
-                        }
-                    }
-                };
-            });
-
-            return result;
-        } catch (err) {
-            console.error('Answer submission failed:', err);
-            return null;
-        }
-    };
-
-    const handleAnswer = async (answer: string) => {
         if (state.phase !== GamePhase.PLAYING) return;
 
-        // Store player answer and transition to RESOLVING
-        setState((prev: GameState) => ({
-            ...prev,
-            phase: GamePhase.RESOLVING,
-            playerAnswer: answer,
-        }));
+        if (state.timeLeft > 0) {
+            timerRef.current = setInterval(() => {
+                dispatch({ type: 'TICK' });
+            }, 1000);
 
-        // Process player answer and get result
-        const result = await processAnswer('player_1', answer);
-
-        // Update correctAnswer from result
-        if (result) {
-            setState((prev: GameState) => ({
-                ...prev,
-                correctAnswer: result.correctAnswer,
-            }));
+            return () => {
+                if (timerRef.current) clearInterval(timerRef.current);
+            };
+        } else if (state.timeLeft === 0 && !selfAnswered) {
+            // Time's up - dispatch TIME_UP action
+            dispatch({ type: 'TIME_UP' });
         }
+    }, [state.phase, state.timeLeft, selfAnswered]);
 
-        // After 2 seconds, move to next question or end game
-        setTimeout(() => {
-            setState((prev: GameState) => {
-                const isLastQuestion = prev.currentQuestionIndex >= (prev.session?.questions.length || 0) - 1;
-                const playerDead = Object.values(prev.players).some((p: PlayerState) => p.health <= 0);
+    // Auto-advance after both answered
+    useEffect(() => {
+        if (state.phase === GamePhase.RESOLVING && selfAnswered && opponentAnswered) {
+            const timer = setTimeout(() => {
+                moveToNextQuestion();
+            }, 2000);
+            return () => clearTimeout(timer);
+        }
+    }, [state.phase, selfAnswered, opponentAnswered]);
 
-                if (isLastQuestion || playerDead) {
-                    // Determine winner
-                    const p1 = prev.players['player_1'];
-                    const b1 = prev.players['bot_1'];
-                    let winnerId = null;
-                    if (p1.health > 0 && (b1.health <= 0 || p1.score > b1.score)) winnerId = 'player_1';
-                    else if (b1.health > 0) winnerId = 'bot_1';
+    // Check if last question and finish game
+    const moveToNextQuestion = useCallback(() => {
+        const isLastQuestion = state.currentQuestionIndex >= (state.session?.questions.length || 0) - 1;
 
-                    return { ...prev, phase: GamePhase.FINISHED, winnerId, lastResult: null };
-                } else {
-                    return {
-                        ...prev,
-                        phase: GamePhase.PLAYING,
-                        currentQuestionIndex: prev.currentQuestionIndex + 1,
-                        timeLeft: 15,
-                        lastResult: null,
-                        // Reset answer states for new question
-                        correctAnswer: null,
-                        playerAnswer: null,
-                        botAnswer: null,
-                    };
-                }
-            });
-        }, 2000);
-    };
+        if (isLastQuestion) {
+            submitBatchAnswers(state.session?.matchId || '');
+            dispatch({ type: 'FINISH_GAME' }); // No payload needed
+        } else {
+            dispatch({ type: 'PREPARE_NEXT_ROUND' });
+        }
+    }, [state.currentQuestionIndex, state.session]);
 
-    // Bot entry point
-    const handleBotAnswer = async (answer: string) => {
+    // Self answer handler - simplified, reducer does validation
+    const handleSelfAnswer = useCallback((answer: string) => {
+        if (state.phase !== GamePhase.PLAYING) return;
+        if (selfAnswered) return;
+        if (!state.session) return;
+
+        const question = state.session.questions[state.currentQuestionIndex];
+
+        // Track for batch submission (need isCorrect for server)
+        const isCorrect = answer !== '' && validateAnswerPure(state, answer);
+        answersBufferRef.current.push({
+            questionId: question.id,
+            answer,
+            responseTimeMs: Date.now() - questionStartTimeRef.current,
+            isCorrect,
+            playerId: 'self',
+        });
+
+        dispatch({
+            type: 'SUBMIT_ANSWER',
+            payload: { playerId: 'self', answer }
+        });
+    }, [state.phase, state.session, state.currentQuestionIndex, selfAnswered]);
+
+    // Opponent answer handler
+    const handleOpponentAnswer = useCallback((answer: string) => {
         if (state.phase !== GamePhase.PLAYING && state.phase !== GamePhase.RESOLVING) return;
+        if (opponentAnswered) return;
+        if (!state.session) return;
 
-        // Store bot answer
-        setState((prev: GameState) => ({
-            ...prev,
-            botAnswer: answer,
-        }));
+        const question = state.session.questions[state.currentQuestionIndex];
+        const isCorrect = validateAnswerPure(state, answer);
 
-        // Process bot answer and get result
-        const result = await processAnswer('bot_1', answer);
+        answersBufferRef.current.push({
+            questionId: question.id,
+            answer,
+            responseTimeMs: 2000 + Math.random() * 2000,
+            isCorrect,
+            playerId: 'opponent',
+        });
 
-        // Update correctAnswer if not already set
-        if (result && !state.correctAnswer) {
-            setState((prev: GameState) => ({
-                ...prev,
-                correctAnswer: result.correctAnswer,
+        dispatch({
+            type: 'SUBMIT_ANSWER',
+            payload: { playerId: 'opponent', answer }
+        });
+    }, [state.phase, state.session, state.currentQuestionIndex, opponentAnswered]);
+
+    // Batch submit to server
+    const submitBatchAnswers = async (matchId: string) => {
+        if (!matchId || answersBufferRef.current.length === 0) return;
+
+        try {
+            const serverAnswers = answersBufferRef.current.map(a => ({
+                questionId: a.questionId,
+                answer: a.answer,
+                responseTimeMs: a.responseTimeMs,
+                isCorrect: a.isCorrect,
+                playerId: a.playerId === 'self'
+                    ? (state.self?.id || 'player_1')
+                    : (state.opponent?.id || 'bot_1')
             }));
+
+            await submitAllAnswers(matchId, serverAnswers);
+        } catch (err) {
+            console.error('Batch submission failed:', err);
         }
     };
 
     return {
-        state,
+        state: {
+            ...state,
+            selfAnswered,
+            opponentAnswered
+        },
         initGame,
-        handleAnswer,
-        handleBotAnswer,
+        startRound,
+        handleAnswer: handleSelfAnswer,
+        handleSelfAnswer,
+        handleOpponentAnswer,
+        handleBotAnswer: handleOpponentAnswer,
     };
 }

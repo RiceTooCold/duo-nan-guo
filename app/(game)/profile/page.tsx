@@ -11,7 +11,7 @@ const mockUser = {
   name: '語言達人',
   level: 15,
   totalScore: 12580,
-  avatar: '/mascot-parrot.png',
+  avatar: '/mascot-parrot.jpg',
 }
 
 // Mock game records

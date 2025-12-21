@@ -7,7 +7,7 @@ interface AvatarProps {
   src: string
   alt: string
   fallback: string
-  size?: 'sm' | 'md' | 'lg'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   badge?: 'online' | 'ai' | 'level'
   badgeValue?: string | number
 }
@@ -16,12 +16,14 @@ const sizeClasses = {
   sm: 'w-12 h-12',
   md: 'w-16 h-16',
   lg: 'w-24 h-24',
+  xl: 'w-32 h-32',
 }
 
 const imageSizes = {
   sm: 48,
   md: 64,
   lg: 96,
+  xl: 128,
 }
 
 export function Avatar({

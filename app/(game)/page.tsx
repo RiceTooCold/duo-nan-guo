@@ -64,7 +64,7 @@ export default function HomePage() {
         >
           <div className="w-full h-full rounded-full bg-gradient-to-br from-[#D5E3F7] to-[#A9C4EB]/40 shadow-2xl flex items-center justify-center border-4 border-white">
             <Avatar
-              src="/mascot-parrot.png"
+              src="/mascot-parrot.jpg"
               alt="DunNanGuo Parrot Mascot"
               fallback="🦜"
               size="lg"

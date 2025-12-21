@@ -14,18 +14,29 @@ interface UseBotProps {
  * Hook to simulate Bot behavior during the game.
  */
 export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: UseBotProps) {
+    // Keep a ref to the latest callback to avoid restarting the effect
+    const onAnswerRef = useRef(onAnswer);
+    useEffect(() => {
+        onAnswerRef.current = onAnswer;
+    });
+
+    // Track whether bot has answered current question
     const hasAnsweredRef = useRef(false);
 
     useEffect(() => {
-        // Reset when moving to a new question (COUNTDOWN resets for new question)
-        if (phase === GamePhase.COUNTDOWN || phase === GamePhase.IDLE) {
+        // Reset when moving to a new question (READY resets for new question)
+        if (phase === GamePhase.READY || phase === GamePhase.IDLE) {
             hasAnsweredRef.current = false;
             return;
         }
 
-        // Bot can answer during PLAYING or RESOLVING (after player answered)
-        if ((phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) ||
-            !isEnabled || !currentQuestion || hasAnsweredRef.current) {
+        // Bot can start thinking during PLAYING or RESOLVING
+        // This prevents the bot from missing its chance to answer if the player
+        // answers quickly and phase transitions to RESOLVING
+        if (phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) {
+            return;
+        }
+        if (!isEnabled || !currentQuestion || hasAnsweredRef.current) {
             return;
         }
 
@@ -33,7 +44,13 @@ export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: U
         const delay = Math.floor(Math.random() * 2000) + 2000;
 
         const timeout = setTimeout(() => {
-            if ((phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) || hasAnsweredRef.current) return;
+            // Check current status one last time
+            if (hasAnsweredRef.current) return;
+
+            // Note: We don't check phase here rigidly because if the phase moved to RESOLVING
+            // (e.g. user answered 0.1s ago), the bot should still likely submit its answer
+            // to show "simultaneous" play, or we can enforce proper phase checks.
+            // For now, let's allow it to answer if it was thinking.
 
             const keys = Object.keys(currentQuestion.options);
             if (keys.length === 0) return;
@@ -42,9 +59,9 @@ export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: U
             const randomKey = keys[Math.floor(Math.random() * keys.length)];
 
             hasAnsweredRef.current = true;
-            onAnswer(randomKey);
+            onAnswerRef.current(randomKey);
         }, delay);
 
         return () => clearTimeout(timeout);
-    }, [phase, currentQuestion, isEnabled, onAnswer]);
+    }, [phase, currentQuestion, isEnabled]); // Removed onAnswer to prevent timer reset on tick
 }
