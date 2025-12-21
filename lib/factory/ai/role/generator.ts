@@ -67,6 +67,69 @@ function isRateLimitError(error: unknown): boolean {
     return false
 }
 
+// Batch generation configuration
+const BATCH_DIVERSITY_CONFIG = {
+    batchSize: 5,  // Generate 5 questions per call
+}
+
+/**
+ * Calculate simple text similarity (Jaccard index on words)
+ */
+function calculateSimilarity(text1: string, text2: string): number {
+    const words1 = new Set(text1.toLowerCase().split(/\s+/))
+    const words2 = new Set(text2.toLowerCase().split(/\s+/))
+    const intersection = new Set([...words1].filter(w => words2.has(w)))
+    const union = new Set([...words1, ...words2])
+    return intersection.size / union.size
+}
+
+/**
+ * Score diversity of a question against existing questions
+ * Higher score = more different from existing
+ */
+function scoreDiversity(
+    question: GeneratedQuestion,
+    existingStimuli: string[]
+): number {
+    if (existingStimuli.length === 0) return 1.0
+
+    const similarities = existingStimuli.map(existing =>
+        calculateSimilarity(question.stimulus, existing)
+    )
+    const avgSimilarity = similarities.reduce((a, b) => a + b, 0) / similarities.length
+
+    return 1 - avgSimilarity
+}
+
+/**
+ * Select the most diverse question from a batch
+ */
+function selectMostDiverse(
+    candidates: GeneratedQuestion[],
+    existingStimuli: string[]
+): GeneratedQuestion {
+    if (candidates.length === 0) {
+        throw new Error('No candidates to select from')
+    }
+    if (candidates.length === 1) {
+        return candidates[0]
+    }
+
+    const scoredCandidates = candidates.map((candidate, index) => {
+        const existingDiversity = scoreDiversity(candidate, existingStimuli)
+        const otherCandidates = candidates.filter((_, i) => i !== index)
+        const batchDiversity = scoreDiversity(
+            candidate,
+            otherCandidates.map(c => c.stimulus)
+        )
+        const totalScore = existingDiversity * 0.7 + batchDiversity * 0.3
+        return { candidate, score: totalScore }
+    })
+
+    scoredCandidates.sort((a, b) => b.score - a.score)
+    return scoredCandidates[0].candidate
+}
+
 /**
  * Generate a single question using Gemini Flash model
  * Uses the shared rate limiter and returns one question with metadata attached
@@ -172,6 +235,144 @@ Please address the feedback:
 
             if (isRateLimitError(error) && attempt < RETRY_CONFIG.maxRetries) {
                 // Rate limit hit, wait and retry
+                await sleep(delayMs)
+                delayMs = Math.min(delayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs)
+                continue
+            }
+
+            return {
+                questions: [],
+                rawResponse: '',
+                success: false,
+                error: lastError.message,
+                rateLimited: isRateLimitError(error),
+            }
+        }
+    }
+
+    return {
+        questions: [],
+        rawResponse: '',
+        success: false,
+        error: lastError?.message || 'Max retries exceeded',
+        rateLimited: true,
+    }
+}
+
+/**
+ * Generate a batch of questions and select the most diverse one
+ * This increases variety by generating multiple candidates and picking the best
+ */
+export async function generateBatchAndSample(
+    targetLanguage: TargetLanguage,
+    rank: number,
+    examQuestionType: ExamQuestionType,
+    topic?: string,
+    existingStimuli?: string[],
+    retryContext?: {
+        feedback: string
+        originalQuestion: GeneratedQuestion
+    }
+): Promise<GenerationResult> {
+    const resolvedTopic = topic || getRandomTopic(targetLanguage, rank)
+    const promptConfig = getPromptConfig(examQuestionType)
+    const batchSize = BATCH_DIVERSITY_CONFIG.batchSize
+
+    // Build prompt requesting multiple diverse questions
+    let userPrompt = promptConfig.userPromptTemplate({ rank, topic: resolvedTopic, count: batchSize })
+
+    // Add diversity instruction
+    userPrompt += `
+
+DIVERSITY REQUIREMENT:
+Generate ${batchSize} DIFFERENT questions. Each question must:
+- Test a DIFFERENT grammar point, vocabulary item, or concept
+- Use a DIFFERENT sentence structure
+- Avoid repeating patterns from other questions in this batch
+`
+
+    // Add retry context if provided
+    if (retryContext) {
+        const { feedback, originalQuestion } = retryContext
+        userPrompt += `
+
+=== RETRY REQUEST ===
+Your previous question:
+Stimulus: ${originalQuestion.stimulus}
+Options: A) ${originalQuestion.interaction.a} B) ${originalQuestion.interaction.b} C) ${originalQuestion.interaction.c} D) ${originalQuestion.interaction.d}
+Answer: ${originalQuestion.correctAnswer}
+
+Reviewer feedback:
+${feedback}
+
+Please generate ${batchSize} NEW questions that address the feedback.
+=== END RETRY ===`
+    }
+
+    let lastError: Error | null = null
+    let delayMs = RETRY_CONFIG.initialDelayMs
+
+    for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+        try {
+            await rateLimiter.acquire()
+
+            const result = await generatorModel.generateContent([
+                { text: promptConfig.systemPrompt },
+                { text: userPrompt },
+            ])
+
+            const response = result.response
+            const text = response.text()
+
+            // Parse JSON response
+            let parsed: unknown
+            try {
+                parsed = JSON.parse(text)
+            } catch {
+                const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
+                if (jsonMatch) {
+                    parsed = JSON.parse(jsonMatch[1])
+                } else {
+                    throw new Error('Could not parse JSON response')
+                }
+            }
+
+            const questionsArray = Array.isArray(parsed) ? parsed : [parsed]
+            const validated = GeneratedQuestionsArraySchema.safeParse(questionsArray)
+
+            if (!validated.success) {
+                return {
+                    questions: [],
+                    rawResponse: text,
+                    success: false,
+                    error: `Validation failed: ${validated.error.message}`,
+                }
+            }
+
+            // Attach metadata to all questions
+            const questionsWithMeta: GeneratedQuestion[] = validated.data.map(q => ({
+                ...q,
+                examQuestionType,
+                topic: resolvedTopic,
+            }))
+
+            // Select the most diverse question
+            const selected = selectMostDiverse(
+                questionsWithMeta,
+                existingStimuli || []
+            )
+
+            return {
+                questions: [selected],
+                examQuestionType,
+                topic: resolvedTopic,
+                rawResponse: text,
+                success: true,
+            }
+        } catch (error) {
+            lastError = error instanceof Error ? error : new Error(String(error))
+
+            if (isRateLimitError(error) && attempt < RETRY_CONFIG.maxRetries) {
                 await sleep(delayMs)
                 delayMs = Math.min(delayMs * RETRY_CONFIG.backoffMultiplier, RETRY_CONFIG.maxDelayMs)
                 continue

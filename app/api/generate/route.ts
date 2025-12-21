@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
 import {
     generateSingleQuestion,
+    generateBatchAndSample,
     createGenerationPlan,
     GeneratedQuestion,
     critiqueQuestion,
@@ -99,10 +100,10 @@ export async function POST(request: NextRequest) {
                 for (let i = 0; i < plan.length; i++) {
                     const { examQuestionType: type, topic: questionTopic } = plan[i]
 
-                    // Lazy load existing questions for dedup (by type + topic)
-                    const cacheKey = `${type}:${questionTopic || ''}`
+                    // Lazy load existing questions for dedup (by type only, not topic)
+                    const cacheKey = type
                     if (!existingByType.has(cacheKey)) {
-                        const existing = await getExistingQuestionsForDedup(targetLanguage, rank, type, 50, questionTopic)
+                        const existing = await getExistingQuestionsForDedup(targetLanguage, rank, type, 50)
                         existingByType.set(cacheKey, existing)
                     }
                     const existingQuestions = existingByType.get(cacheKey) || []
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
                     while (retryCount <= MAX_RETRIES && !approved) {
                         const isRetry = retryCount > 0
 
-                        // Step 1: Generate
+                        // Step 1: Generate (batch + sample for diversity)
                         sendQuestionUpdate(i, {
                             status: isRetry ? 'retrying' : 'generating',
                             topic: questionTopic,
@@ -125,11 +126,15 @@ export async function POST(request: NextRequest) {
                             retryCount: isRetry ? retryCount : undefined,
                         })
 
-                        const genResult = await generateSingleQuestion(
+                        // Collect existing stimuli for diversity scoring
+                        const existingStimuli = existingQuestions.map(q => q.stimulus)
+
+                        const genResult = await generateBatchAndSample(
                             targetLanguage,
                             rank,
                             type,
                             questionTopic,
+                            existingStimuli,
                             isRetry && question ? { feedback: criticFeedback!, originalQuestion: question } : undefined
                         )
 
