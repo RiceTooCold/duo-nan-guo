@@ -49,4 +49,8 @@ export interface GameState {
   winnerId: string | null;
   lastResult: AnswerResult | null; // For immediate feedback
   error: string | null;
+  // UI State fields
+  correctAnswer: string | null;
+  playerAnswer: string | null;
+  botAnswer: string | null;
 }

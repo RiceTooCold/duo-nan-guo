@@ -1,5 +1,28 @@
-import { GameLayout } from '@/lib/ui/game'
+'use client'
 
-export default function Layout({ children }: { children: React.ReactNode }) {
-  return <GameLayout>{children}</GameLayout>
+import { AnimatePresence, motion } from 'framer-motion'
+import { usePathname } from 'next/navigation'
+import './game-theme.css'
+
+export default function GameLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname()
+
+  return (
+    <div className="min-h-dvh bg-[#A9C4EB]/30">
+      <div className="game-app game-mobile-container bg-white shadow-xl">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.25, ease: 'easeInOut' }}
+            className="min-h-dvh"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </div>
+  )
 }

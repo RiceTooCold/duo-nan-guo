@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Avatar } from './components/Avatar'
-import { CountdownOverlay } from './components/CountdownOverlay'
+import { Avatar } from './Avatar'
+import { CountdownOverlay } from './CountdownOverlay'
 import { Bot, Users, CheckCircle2, MessageSquare } from 'lucide-react'
 
 interface Player {

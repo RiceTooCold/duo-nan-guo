@@ -9,12 +9,15 @@ export function useGameLoop() {
     const [state, setState] = useState<GameState>({
         phase: GamePhase.IDLE,
         currentQuestionIndex: 0,
-        timeLeft: 10,
+        timeLeft: 15,
         session: null,
         players: {},
         winnerId: null,
         lastResult: null,
         error: null,
+        correctAnswer: null,
+        playerAnswer: null,
+        botAnswer: null,
     });
 
     const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -59,7 +62,7 @@ export function useGameLoop() {
                 }, 1000);
                 return () => clearTimeout(timer);
             } else {
-                setState((prev: GameState) => ({ ...prev, phase: GamePhase.PLAYING, timeLeft: 10 }));
+                setState((prev: GameState) => ({ ...prev, phase: GamePhase.PLAYING, timeLeft: 15 }));
             }
         }
     }, [state.phase, state.timeLeft]);
@@ -122,11 +125,23 @@ export function useGameLoop() {
     const handleAnswer = async (answer: string) => {
         if (state.phase !== GamePhase.PLAYING) return;
 
-        // Transition to RESOLVING immediately when player answers
-        setState((prev: GameState) => ({ ...prev, phase: GamePhase.RESOLVING }));
+        // Store player answer and transition to RESOLVING
+        setState((prev: GameState) => ({
+            ...prev,
+            phase: GamePhase.RESOLVING,
+            playerAnswer: answer,
+        }));
 
-        // Process player answer
-        await processAnswer('player_1', answer);
+        // Process player answer and get result
+        const result = await processAnswer('player_1', answer);
+
+        // Update correctAnswer from result
+        if (result) {
+            setState((prev: GameState) => ({
+                ...prev,
+                correctAnswer: result.correctAnswer,
+            }));
+        }
 
         // After 2 seconds, move to next question or end game
         setTimeout(() => {
@@ -148,8 +163,12 @@ export function useGameLoop() {
                         ...prev,
                         phase: GamePhase.PLAYING,
                         currentQuestionIndex: prev.currentQuestionIndex + 1,
-                        timeLeft: 10,
+                        timeLeft: 15,
                         lastResult: null,
+                        // Reset answer states for new question
+                        correctAnswer: null,
+                        playerAnswer: null,
+                        botAnswer: null,
                     };
                 }
             });
@@ -158,8 +177,24 @@ export function useGameLoop() {
 
     // Bot entry point
     const handleBotAnswer = async (answer: string) => {
-        if (state.phase !== GamePhase.PLAYING) return;
-        await processAnswer('bot_1', answer);
+        if (state.phase !== GamePhase.PLAYING && state.phase !== GamePhase.RESOLVING) return;
+
+        // Store bot answer
+        setState((prev: GameState) => ({
+            ...prev,
+            botAnswer: answer,
+        }));
+
+        // Process bot answer and get result
+        const result = await processAnswer('bot_1', answer);
+
+        // Update correctAnswer if not already set
+        if (result && !state.correctAnswer) {
+            setState((prev: GameState) => ({
+                ...prev,
+                correctAnswer: result.correctAnswer,
+            }));
+        }
     };
 
     return {

@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 
-export function LoginScreen() {
+export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -14,10 +14,10 @@ export function LoginScreen() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-    
+
     // Simulate login
     await new Promise(resolve => setTimeout(resolve, 1500))
-    
+
     // Redirect to profile after login
     window.location.href = '/profile'
   }
@@ -51,7 +51,7 @@ export function LoginScreen() {
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
       >
-        <Link 
+        <Link
           href="/"
           className="inline-flex items-center gap-2 text-[#64748b] hover:text-[#333] transition-colors"
         >
@@ -126,8 +126,8 @@ export function LoginScreen() {
 
         {/* Forgot Password */}
         <div className="text-right">
-          <Link 
-            href="#" 
+          <Link
+            href="#"
             className="text-sm text-[#5B8BD4] hover:underline"
           >
             忘記密碼？
@@ -191,4 +191,3 @@ export function LoginScreen() {
     </div>
   )
 }
-

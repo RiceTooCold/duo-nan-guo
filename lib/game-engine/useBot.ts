@@ -17,19 +17,23 @@ export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: U
     const hasAnsweredRef = useRef(false);
 
     useEffect(() => {
-        // Reset when moving to a new question
-        if (phase !== GamePhase.PLAYING) {
+        // Reset when moving to a new question (COUNTDOWN resets for new question)
+        if (phase === GamePhase.COUNTDOWN || phase === GamePhase.IDLE) {
             hasAnsweredRef.current = false;
             return;
         }
 
-        if (!isEnabled || !currentQuestion || hasAnsweredRef.current) return;
+        // Bot can answer during PLAYING or RESOLVING (after player answered)
+        if ((phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) ||
+            !isEnabled || !currentQuestion || hasAnsweredRef.current) {
+            return;
+        }
 
         // Simulate thinking time (2-4 seconds)
         const delay = Math.floor(Math.random() * 2000) + 2000;
 
         const timeout = setTimeout(() => {
-            if (phase !== GamePhase.PLAYING || hasAnsweredRef.current) return;
+            if ((phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) || hasAnsweredRef.current) return;
 
             const keys = Object.keys(currentQuestion.options);
             if (keys.length === 0) return;
