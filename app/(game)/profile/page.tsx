@@ -113,7 +113,7 @@ export default function ProfilePage() {
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: index * 0.1 }}
               whileHover={{ scale: 1.01 }}
-              onClick={() => router.push(`/record/${record.id}`)}
+              onClick={() => router.push(`/history/${record.id}`)}
             >
               {/* Language Flag */}
               <div className="w-12 h-12 rounded-xl bg-[#D5E3F7] flex items-center justify-center text-2xl">

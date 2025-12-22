@@ -23,12 +23,6 @@ export interface GameSession {
   rank: number;
 }
 
-export interface AnswerResult {
-  isCorrect: boolean;
-  correctAnswer: string;
-  newScore: number;
-  isGameOver: boolean;
-}
 
 export interface PlayerState {
   id: string;
@@ -49,11 +43,43 @@ export interface GameState {
   self: PlayerState | null;
   opponent: PlayerState | null;
   winnerId: string | null;
-  lastResult: AnswerResult | null;
   error: string | null;
   // Answer tracking
   correctAnswer: string | null;
   selfAnswer: string | null;
   opponentAnswer: string | null;
+  // Immediate feedback (visible during PLAYING, before RESOLVING reveals choices)
+  selfIsCorrect: boolean | null;
+  opponentIsCorrect: boolean | null;
   // selfAnswered and opponentAnswered are removed - derive from answer != null
+}
+
+// ============================================
+// Game Result Types (for result screen)
+// ============================================
+
+export interface PlayerResult {
+  id: string;
+  name: string;
+  score: number;
+  avatar?: string | null;
+  isBot: boolean;
+  // Stats
+  correctAnswers: number;
+  accuracy: number;
+  maxStreak: number;
+}
+
+export interface GameResult {
+  matchId: string;
+  outcome: 'win' | 'lose' | 'tie';
+  // Symmetric player data
+  self: PlayerResult;
+  opponent: PlayerResult;
+  // Match metadata
+  match: {
+    totalQuestions: number;
+    language: string;
+    level: string;
+  };
 }

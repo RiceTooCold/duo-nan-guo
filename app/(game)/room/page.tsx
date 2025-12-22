@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, Bot } from 'lucide-react'
 import { WaitingRoomScreen } from '@/components/game/WaitingRoomScreen'
 import { createMatch } from '@/actions/game.server'
@@ -14,6 +15,7 @@ type RoomPhase = 'setup' | 'waiting'
 
 export default function RoomPage() {
   const router = useRouter()
+  const { data: session } = useSession()
 
   // Room phase management
   const [roomPhase, setRoomPhase] = useState<RoomPhase>('setup')
@@ -41,8 +43,8 @@ export default function RoomPage() {
       // Convert level label to rank number
       const rank = levelToRank(selectedLanguage.id, selectedLevel)
 
-      // Create match on server
-      const { matchId } = await createMatch(null, {
+      // Create match on server with real user ID
+      const { matchId } = await createMatch(session?.user?.id || null, {
         lang: selectedLanguage.id as TargetLanguage,
         rank,
         count: selectedCount,
@@ -65,6 +67,8 @@ export default function RoomPage() {
         level={selectedLevel}
         count={selectedCount}
         mode={opponent}
+        userName={session?.user?.name}
+        userAvatar={session?.user?.image}
         onStart={handleWaitingComplete}
         onCancel={() => setRoomPhase('setup')}
       />
@@ -77,7 +81,7 @@ export default function RoomPage() {
       {/* Header */}
       <header className="px-4 py-4 border-b-2 border-[#D5E3F7] flex items-center gap-4 bg-white">
         <Link
-          href="/profile"
+          href="/lobby"
           className="p-2 -ml-2 rounded-full hover:bg-[#D5E3F7] transition-colors"
         >
           <ArrowLeft className="w-5 h-5 text-[#333]" />
@@ -175,7 +179,7 @@ export default function RoomPage() {
               whileTap={{ scale: 0.98 }}
             >
               <Bot className="w-8 h-8 text-[#3b82f6]" />
-              <span className="font-semibold text-[#333]">AI Bot</span>
+              <span className="font-semibold text-[#333]">LLM Bot</span>
               <span className="text-xs text-[#64748b]">單人練習</span>
             </motion.button>
             <motion.button

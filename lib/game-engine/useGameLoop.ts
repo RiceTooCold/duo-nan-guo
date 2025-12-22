@@ -103,11 +103,11 @@ export function useGameLoop() {
             return () => {
                 if (timerRef.current) clearInterval(timerRef.current);
             };
-        } else if (state.timeLeft === 0 && !selfAnswered) {
-            // Time's up - dispatch TIME_UP action
+        } else if (state.timeLeft === 0) {
+            // Time's up - reducer handles marking unanswered players
             dispatch({ type: 'TIME_UP' });
         }
-    }, [state.phase, state.timeLeft, selfAnswered]);
+    }, [state.phase, state.timeLeft]);
 
     // Auto-advance after both answered
     useEffect(() => {

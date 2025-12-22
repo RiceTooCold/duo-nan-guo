@@ -1,4 +1,4 @@
-import { GamePhase, type GameState, type GameSession, type PlayerState, type AnswerResult } from '@/types/game';
+import { GamePhase, type GameState, type GameSession, type PlayerState } from '@/types/game';
 
 /** Simple hash function for answer validation */
 function hashAnswer(answer: string): string {
@@ -33,7 +33,6 @@ export type GameAction =
     | { type: 'TIME_UP' } // Handle timeout in reducer
     | { type: 'SET_ERROR'; payload: string };
 
-// Initial State
 export const initialGameState: GameState = {
     phase: GamePhase.IDLE,
     currentQuestionIndex: 0,
@@ -42,11 +41,12 @@ export const initialGameState: GameState = {
     self: null,
     opponent: null,
     winnerId: null,
-    lastResult: null,
     error: null,
     correctAnswer: null,
     selfAnswer: null,
     opponentAnswer: null,
+    selfIsCorrect: null,
+    opponentIsCorrect: null,
 };
 
 // Helper: Validate answer against hash
@@ -104,13 +104,23 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
         }
 
         case 'TIME_UP': {
-            // Auto-fail for self if not answered
-            if (state.selfAnswer !== null) return state; // Already answered
-
+            // Time's up - force both players to have answers and transition to RESOLVING
             const correctAnswer = getCorrectAnswer(state);
+
+            // Mark unanswered players as timeout (empty string)
+            const newSelfAnswer = state.selfAnswer ?? '';
+            const newOpponentAnswer = state.opponentAnswer ?? '';
+
+            // Calculate correctness for anyone who timed out (they're wrong)
+            const selfIsCorrect = state.selfIsCorrect ?? false;
+            const opponentIsCorrect = state.opponentIsCorrect ?? false;
+
             return {
                 ...state,
-                selfAnswer: '', // Empty string = timeout/no answer
+                selfAnswer: newSelfAnswer,
+                opponentAnswer: newOpponentAnswer,
+                selfIsCorrect,
+                opponentIsCorrect,
                 correctAnswer,
                 phase: GamePhase.RESOLVING,
             };
@@ -123,9 +133,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
             // Validate answer using reducer's pure function
             const isCorrect = validateAnswer(state, answer);
             const scoreChange = isCorrect ? 10 : 0;
-
-            // Calculate correct answer (only reveal on self answer)
-            const correctAnswer = isSelf ? getCorrectAnswer(state) : state.correctAnswer;
 
             // Update self player state
             const newSelf = isSelf && state.self
@@ -153,18 +160,28 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 }
                 : state.opponent;
 
+            // Track answers and correctness
+            const newSelfAnswer = isSelf ? answer : state.selfAnswer;
+            const newOpponentAnswer = !isSelf ? answer : state.opponentAnswer;
+            const newSelfIsCorrect = isSelf ? isCorrect : state.selfIsCorrect;
+            const newOpponentIsCorrect = !isSelf ? isCorrect : state.opponentIsCorrect;
+
             const newState = {
                 ...state,
                 self: newSelf,
                 opponent: newOpponent,
-                selfAnswer: isSelf ? answer : state.selfAnswer,
-                opponentAnswer: !isSelf ? answer : state.opponentAnswer,
-                correctAnswer,
+                selfAnswer: newSelfAnswer,
+                opponentAnswer: newOpponentAnswer,
+                selfIsCorrect: newSelfIsCorrect,
+                opponentIsCorrect: newOpponentIsCorrect,
             };
 
-            // Self answering triggers RESOLVING phase
-            if (isSelf) {
-                return { ...newState, phase: GamePhase.RESOLVING };
+            // Check if BOTH have now answered → transition to RESOLVING
+            const bothAnswered = newSelfAnswer !== null && newOpponentAnswer !== null;
+
+            if (bothAnswered) {
+                const correctAnswer = getCorrectAnswer(state);
+                return { ...newState, correctAnswer, phase: GamePhase.RESOLVING };
             }
 
             return newState;
@@ -183,10 +200,11 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 phase: GamePhase.READY,
                 currentQuestionIndex: state.currentQuestionIndex + 1,
                 timeLeft: 15,
-                lastResult: null,
                 correctAnswer: null,
                 selfAnswer: null,
                 opponentAnswer: null,
+                selfIsCorrect: null,
+                opponentIsCorrect: null,
             };
         }
 
@@ -197,7 +215,6 @@ export function gameReducer(state: GameState, action: GameAction): GameState {
                 ...state,
                 phase: GamePhase.FINISHED,
                 winnerId,
-                lastResult: null,
             };
         }
 

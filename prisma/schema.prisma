@@ -113,37 +113,70 @@ enum MatchStatus {
 }
 
 // ============================================
-// MODELS - User & Auth
+// ENUMS - User Roles
+// ============================================
+
+enum UserRole {
+  user
+  admin
+}
+
+// ============================================
+// MODELS - User & Auth (NextAuth Compatible)
 // ============================================
 
 model User {
-  id          String     @id @default(auto()) @map("_id") @db.ObjectId
+  id            String     @id @default(auto()) @map("_id") @db.ObjectId
+  name          String?
+  email         String?    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole   @default(user)
   
-  // Identity (OAuth or Bot)
-  provider    String     // "google" | "discord" | "llm_bot"
-  providerId  String     // Provider's user ID or Bot unique ID
-  email       String?    @unique
-  name        String?
-  avatar      String?
+  // NextAuth relations
+  accounts      Account[]
   
-  // Bot-specific fields
-  isBot       Boolean    @default(false)
-  botModel    String?    // e.g., "gemini-2.5-flash", "gpt-4o"
+  // Bot-specific fields (for game bots)
+  isBot         Boolean    @default(false)
+  botModel      String?    // e.g., "gemini-2.5-flash", "gpt-4o"
   
   // Denormalized stats (updated after each match)
-  stats       UserStats?
+  stats         UserStats?
   
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
   
-  @@unique([provider, providerId])
   @@index([isBot])
 }
+
+model Account {
+  id                String  @id @default(auto()) @map("_id") @db.ObjectId
+  userId            String  @db.ObjectId
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+
 
 type UserStats {
   totalMatches   Int   @default(0)
   wins           Int   @default(0)
+  losses         Int   @default(0)
+  ties           Int   @default(0)
   correctRate    Float @default(0)
+  totalXp        Int   @default(0)
 }
 
 // ============================================

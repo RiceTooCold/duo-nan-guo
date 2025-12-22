@@ -20,16 +20,24 @@ interface WaitingRoomScreenProps {
     level: string
     count: number
     mode: 'bot' | 'player'
+    userName?: string | null
+    userAvatar?: string | null
     onStart: () => Promise<void>  // Now async to allow match creation
     onCancel?: () => void  // 取消回到設定
 }
 
 const TAUNTS = ['😂', '😎', '🔥', '💩', '😠', '🙏']
 
-export function WaitingRoomScreen({ language, level, count, mode, onStart, onCancel }: WaitingRoomScreenProps) {
+export function WaitingRoomScreen({ language, level, count, mode, userName, userAvatar, onStart, onCancel }: WaitingRoomScreenProps) {
     const [status, setStatus] = useState<'searching' | 'waiting' | 'starting'>('searching')
     const [players, setPlayers] = useState<Player[]>([
-        { id: 'me', name: '你 (Player)', avatar: '/mascot-parrot.jpg', fallback: '🦜', isReady: false }
+        {
+            id: 'me',
+            name: userName || 'Player',
+            avatar: userAvatar || '/mascot-parrot.jpg',
+            fallback: userName?.charAt(0).toUpperCase() || '🦜',
+            isReady: false
+        }
     ])
     const [countdown, setCountdown] = useState(5)
     const [showCountdown, setShowCountdown] = useState(false)

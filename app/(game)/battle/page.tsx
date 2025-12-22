@@ -66,8 +66,6 @@ function BattleContent() {
   // ----------------------------------
 
 
-
-
   // Initialize game on mount using matchId
   useEffect(() => {
     if (matchId) {
@@ -86,25 +84,46 @@ function BattleContent() {
       const botScore = opponentState?.score || 0
 
       // Calculate correct answers (score / 10 since each correct = 10 points)
-      const correctAnswers = Math.floor(playerScore / 10)
-      const accuracy = totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0
+      const playerCorrectAnswers = Math.floor(playerScore / 10)
+      const playerAccuracy = totalQuestions > 0 ? Math.round((playerCorrectAnswers / totalQuestions) * 100) : 0
+
+      const opponentCorrectAnswers = Math.floor(botScore / 10)
+      const opponentAccuracy = totalQuestions > 0 ? Math.round((opponentCorrectAnswers / totalQuestions) * 100) : 0
+
+      // Explicit outcome determination (fixes bug where loss was shown as tie)
+      const outcome = state.winnerId === 'self' ? 'win' as const
+        : state.winnerId === 'opponent' ? 'lose' as const
+          : 'tie' as const;
 
       // Store result in Zustand for instant display
       setResult({
         matchId: state.session.matchId,
-        isWin: state.winnerId === 'self',
-        playerScore,
-        botScore,
-        correctAnswers,
-        totalQuestions,
-        accuracy,
-        maxCombo: selfState?.maxStreak || 0, // Use maxStreak tracked during game
-        language: langParam,
-        level: levelLabel,
-        playerName: selfState?.name || 'You',
-        botName: opponentState?.name || 'AI Bot',
-        playerAvatar: selfState?.avatar,
-        botAvatar: opponentState?.avatar,
+        outcome,
+        self: {
+          id: selfState?.id || 'player_1',
+          name: selfState?.name || 'You',
+          score: playerScore,
+          avatar: selfState?.avatar,
+          isBot: false,
+          correctAnswers: playerCorrectAnswers,
+          accuracy: playerAccuracy,
+          maxStreak: selfState?.maxStreak || 0,
+        },
+        opponent: {
+          id: opponentState?.id || 'opponent',
+          name: opponentState?.name || 'Opponent',
+          score: botScore,
+          avatar: opponentState?.avatar,
+          isBot: opponentState?.isBot || false,
+          correctAnswers: opponentCorrectAnswers,
+          accuracy: opponentAccuracy,
+          maxStreak: opponentState?.maxStreak || 0,
+        },
+        match: {
+          totalQuestions,
+          language: langParam,
+          level: levelLabel,
+        },
       })
 
       router.push('/battle/results')
@@ -112,14 +131,24 @@ function BattleContent() {
   }, [state.phase, state.winnerId, state.session, selfState, opponentState, totalQuestions, langParam, rankParam, router, setResult])
 
   // Determine option state for UI
+  // During PLAYING: show own result immediately (correct/incorrect on selected)
+  // During RESOLVING: reveal correct answer + all selections
   const getOptionState = (optionId: string): 'default' | 'selected' | 'correct' | 'incorrect' => {
-    if (state.phase !== GamePhase.RESOLVING && state.phase !== GamePhase.FINISHED) {
-      if (state.selfAnswer === optionId) return 'selected'
+    const isResolvingOrFinished = state.phase === GamePhase.RESOLVING || state.phase === GamePhase.FINISHED
+
+    // RESOLVING/FINISHED: Full reveal
+    if (isResolvingOrFinished) {
+      if (optionId === state.correctAnswer) return 'correct'
+      if (state.selfAnswer === optionId && optionId !== state.correctAnswer) return 'incorrect'
       return 'default'
     }
 
-    if (optionId === state.correctAnswer) return 'correct'
-    if (state.selfAnswer === optionId && optionId !== state.correctAnswer) return 'incorrect'
+    // PLAYING: Self sees their own result immediately
+    if (state.selfAnswer === optionId) {
+      // Show correct/incorrect based on selfIsCorrect
+      return state.selfIsCorrect ? 'correct' : 'incorrect'
+    }
+
     return 'default'
   }
 
@@ -270,6 +299,14 @@ function BattleContent() {
                 disabled={isRevealing || isShowingResult || state.selfAnswered}
                 index={index}
                 onClick={() => handleAnswer(key)}
+                selfBadge={state.selfAnswer === key ? {
+                  avatar: selfState?.avatar,
+                  fallback: selfState?.name?.charAt(0) || '🦜'
+                } : null}
+                opponentBadge={isShowingResult && state.opponentAnswer === key ? {
+                  avatar: opponentState?.avatar,
+                  fallback: opponentState?.isBot ? '🤖' : (opponentState?.name?.charAt(0) || 'O')
+                } : null}
               />
             </motion.div>
           ))}
@@ -304,9 +341,9 @@ function BattleContent() {
         >
           <div className="relative">
             <Avatar
-              src="/mascot-parrot.jpg"
-              alt="Player Parrot"
-              fallback="🦜"
+              src={selfState?.avatar || '/mascot-parrot.jpg'}
+              alt={selfState?.name || 'Player'}
+              fallback={selfState?.name?.charAt(0) || '🦜'}
               size="md"
               badge="online"
             />
@@ -315,13 +352,10 @@ function BattleContent() {
               {state.phase === GamePhase.PLAYING && !state.selfAnswered && (
                 <StatusBubble text="等待作答..." variant="waiting" direction="left" />
               )}
-              {state.phase === GamePhase.PLAYING && state.selfAnswered && !state.opponentAnswered && (
-                <StatusBubble text="等待對手..." variant="thinking" direction="left" />
-              )}
-              {isShowingResult && state.selfAnswer && (
+              {(state.phase === GamePhase.PLAYING || state.phase === GamePhase.RESOLVING) && state.selfAnswered && (
                 <StatusBubble
-                  text={state.selfAnswer === state.correctAnswer ? '正確!' : '錯誤...'}
-                  variant={state.selfAnswer === state.correctAnswer ? 'correct' : 'incorrect'}
+                  text={state.selfIsCorrect ? '正確!' : '錯誤...'}
+                  variant={state.selfIsCorrect ? 'correct' : 'incorrect'}
                   direction="left"
                 />
               )}
@@ -341,24 +375,21 @@ function BattleContent() {
         >
           <div className="relative">
             <Avatar
-              src="/mascot-robot.jpg"
-              alt="Bot Robot"
-              fallback="🤖"
+              src={opponentState?.avatar || '/mascot-robot.jpg'}
+              alt={opponentState?.name || 'Bot'}
+              fallback={opponentState?.isBot ? '🤖' : opponentState?.name?.charAt(0) || 'O'}
               size="md"
-              badge="ai"
+              badge={opponentState?.isBot ? 'ai' : 'online'}
             />
             {/* Status Bubbles for Bot */}
             <div className="absolute -top-8 -left-2 min-w-[80px]">
               {state.phase === GamePhase.PLAYING && !state.opponentAnswered && (
                 <StatusBubble text="思考中..." variant="thinking" direction="right" />
               )}
-              {state.phase === GamePhase.PLAYING && state.opponentAnswered && (
-                <StatusBubble text="已作答" variant="default" direction="right" />
-              )}
-              {isShowingResult && (
+              {(state.phase === GamePhase.PLAYING || state.phase === GamePhase.RESOLVING) && state.opponentAnswered && (
                 <StatusBubble
-                  text={state.opponentAnswer === state.correctAnswer ? '正確!' : '錯誤...'}
-                  variant={state.opponentAnswer === state.correctAnswer ? 'correct' : 'incorrect'}
+                  text={state.opponentIsCorrect ? '正確!' : '錯誤...'}
+                  variant={state.opponentIsCorrect ? 'correct' : 'incorrect'}
                   direction="right"
                 />
               )}

@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Trophy, Target, Zap, RotateCcw, Home } from 'lucide-react'
 import confetti from 'canvas-confetti'
@@ -12,15 +11,7 @@ import { useGameResultStore } from '@/lib/game-engine/useGameResultStore'
 export default function ResultsPage() {
   const router = useRouter()
   const result = useGameResultStore((s) => s.result)
-  const clearResult = useGameResultStore((s) => s.clearResult)
   const [showStats, setShowStats] = useState(false)
-
-  // Redirect if no result (e.g., direct navigation)
-  useEffect(() => {
-    if (!result) {
-      router.replace('/room')
-    }
-  }, [result, router])
 
   useEffect(() => {
     if (!result) return
@@ -29,7 +20,7 @@ export default function ResultsPage() {
     const timer = setTimeout(() => setShowStats(true), 500)
 
     // Confetti effect for win
-    if (result.isWin) {
+    if (result.outcome === 'win') {
       const duration = 3000
       const end = Date.now() + duration
 
@@ -59,39 +50,57 @@ export default function ResultsPage() {
     return () => clearTimeout(timer)
   }, [result])
 
-  // Clear result when leaving page (optional: keep for "再玩一局")
-  useEffect(() => {
-    return () => {
-      // Don't clear on unmount - let it persist for potential "view again"
-      // clearResult()
-    }
-  }, [])
-
-  // Handle play again - clear result and navigate
+  // Navigate to play again
   const handlePlayAgain = () => {
-    clearResult()
     router.push('/room')
   }
 
+  // Navigate to lobby
   const handleGoHome = () => {
-    clearResult()
-    router.push('/profile')
+    router.push('/lobby')
   }
 
-  // Loading / Redirect state
+  // No result state - direct navigation without playing
   if (!result) {
     return (
-      <div className="min-h-dvh flex items-center justify-center bg-white">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-[#5B8BD4] border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-[#64748b] font-bold">載入中...</p>
-        </div>
+      <div className="min-h-dvh flex flex-col items-center justify-center bg-[#F5F8FC] p-4">
+        <p className="text-[#64748b] mb-4">尚無對戰結果</p>
+        <button
+          onClick={() => router.push('/room')}
+          className="text-[#5B8BD4] font-semibold"
+        >
+          前往開始對戰 →
+        </button>
       </div>
     )
   }
 
+  // Outcome display config
+  const outcomeConfig = {
+    win: {
+      emoji: '🎉',
+      title: '勝利！',
+      subtitle: '太棒了！你贏得了這場對戰！',
+      animation: { rotate: [0, -10, 10, -10, 0] },
+    },
+    lose: {
+      emoji: '💪',
+      title: '再接再厲！',
+      subtitle: '別灰心，下次一定能贏！',
+      animation: { y: [0, -10, 0] },
+    },
+    tie: {
+      emoji: '🤝',
+      title: '平手！',
+      subtitle: '勢均力敵！真是一場精彩的對決！',
+      animation: { scale: [1, 1.1, 1] },
+    },
+  }
+
+  const config = outcomeConfig[result.outcome]
+
   return (
-    <div className="min-h-dvh flex flex-col bg-gradient-to-b from-[#A9C4EB]/30 via-white to-[#D5E3F7]/30 px-4 py-8">
+    <div className="min-h-dvh flex flex-col bg-linear-to-b from-[#A9C4EB]/30 via-white to-[#D5E3F7]/30 px-4 py-8">
       {/* Result Title */}
       <motion.div
         className="text-center mb-8"
@@ -99,38 +108,20 @@ export default function ResultsPage() {
         animate={{ opacity: 1, scale: 1 }}
         transition={{ type: 'spring', stiffness: 200 }}
       >
-        {result.isWin ? (
-          <>
-            <motion.div
-              className="text-6xl mb-4"
-              animate={{ rotate: [0, -10, 10, -10, 0] }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              🎉
-            </motion.div>
-            <h1 className="text-4xl font-black text-[#333] mb-2">
-              勝利！
-            </h1>
-            <p className="text-[#64748b]">太棒了！你贏得了這場對戰！</p>
-          </>
-        ) : (
-          <>
-            <motion.div
-              className="text-6xl mb-4"
-              animate={{ y: [0, -10, 0] }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-            >
-              💪
-            </motion.div>
-            <h1 className="text-4xl font-black text-[#333] mb-2">
-              再接再厲！
-            </h1>
-            <p className="text-[#64748b]">別灰心，下次一定能贏！</p>
-          </>
-        )}
+        <motion.div
+          className="text-6xl mb-4"
+          animate={config.animation}
+          transition={{ duration: 0.5, delay: 0.3 }}
+        >
+          {config.emoji}
+        </motion.div>
+        <h1 className="text-4xl font-black text-[#333] mb-2">
+          {config.title}
+        </h1>
+        <p className="text-[#64748b]">{config.subtitle}</p>
       </motion.div>
 
-      {/* Score Comparison */}
+      {/* Score Comparison - Symmetric self vs opponent */}
       <motion.div
         className="game-card p-6 mb-6"
         initial={{ opacity: 0, y: 20 }}
@@ -138,24 +129,24 @@ export default function ResultsPage() {
         transition={{ delay: 0.2 }}
       >
         <div className="flex items-center justify-between">
-          {/* Player */}
+          {/* Self (Left) */}
           <div className="text-center flex-1">
             <div className="mb-2 flex justify-center">
               <Avatar
-                src={result.playerAvatar || "/mascot-parrot.jpg"}
+                src={result.self.avatar || "/mascot-parrot.jpg"}
                 alt="Player"
-                fallback="🦜"
+                fallback={result.self.name.charAt(0) || '🦜'}
                 size="md"
               />
             </div>
-            <p className="text-sm text-[#64748b] mb-1">{result.playerName}</p>
+            <p className="text-sm text-[#64748b] mb-1">{result.self.name}</p>
             <motion.p
               className="text-3xl font-black text-[#5B8BD4]"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.5, type: 'spring' }}
             >
-              {result.playerScore}
+              {result.self.score}
             </motion.p>
           </div>
 
@@ -164,24 +155,24 @@ export default function ResultsPage() {
             <span className="text-2xl font-bold text-[#64748b]">VS</span>
           </div>
 
-          {/* Bot */}
+          {/* Opponent (Right) */}
           <div className="text-center flex-1">
             <div className="mb-2 flex justify-center">
               <Avatar
-                src={result.botAvatar || "/mascot-robot.jpg"}
-                alt="Bot"
-                fallback="🤖"
+                src={result.opponent.avatar || "/mascot-robot.jpg"}
+                alt="Opponent"
+                fallback={result.opponent.isBot ? '🤖' : (result.opponent.name.charAt(0) || 'O')}
                 size="md"
               />
             </div>
-            <p className="text-sm text-[#64748b] mb-1">{result.botName}</p>
+            <p className="text-sm text-[#64748b] mb-1">{result.opponent.name}</p>
             <motion.p
               className="text-3xl font-black text-[#333]/50"
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ delay: 0.6, type: 'spring' }}
             >
-              {result.botScore}
+              {result.opponent.score}
             </motion.p>
           </div>
         </div>
@@ -203,18 +194,18 @@ export default function ResultsPage() {
                   <Target className="w-5 h-5 text-[#5B8BD4]" />
                   <span className="font-semibold text-[#333]">準確率</span>
                 </div>
-                <span className="text-lg font-bold text-[#5B8BD4]">{result.accuracy}%</span>
+                <span className="text-lg font-bold text-[#5B8BD4]">{result.self.accuracy}%</span>
               </div>
               <div className="h-3 bg-[#D5E3F7] rounded-full overflow-hidden">
                 <motion.div
                   className="h-full bg-gradient-to-r from-[#5B8BD4] to-[#A9C4EB] rounded-full"
                   initial={{ width: 0 }}
-                  animate={{ width: `${result.accuracy}%` }}
+                  animate={{ width: `${result.self.accuracy}%` }}
                   transition={{ duration: 1, delay: 0.5 }}
                 />
               </div>
               <p className="text-sm text-[#64748b] mt-2">
-                {result.correctAnswers} / {result.totalQuestions} 正確
+                {result.self.correctAnswers} / {result.match.totalQuestions} 正確
               </p>
             </div>
 
@@ -228,8 +219,8 @@ export default function ResultsPage() {
                 transition={{ delay: 0.6 }}
               >
                 <Trophy className="w-8 h-8 text-[#f59e0b] mx-auto mb-2" />
-                <p className="text-2xl font-bold text-[#333]">{result.language}</p>
-                <p className="text-xs text-[#64748b]">{result.level}</p>
+                <p className="text-2xl font-bold text-[#333]">{result.match.language}</p>
+                <p className="text-xs text-[#64748b]">{result.match.level}</p>
               </motion.div>
 
               <motion.div
@@ -239,7 +230,7 @@ export default function ResultsPage() {
                 transition={{ delay: 0.7 }}
               >
                 <Zap className="w-8 h-8 text-[#ef4444] mx-auto mb-2" />
-                <p className="text-2xl font-bold text-[#333]">{result.maxCombo}x</p>
+                <p className="text-2xl font-bold text-[#333]">{result.self.maxStreak}x</p>
                 <p className="text-xs text-[#64748b]">最高連擊</p>
               </motion.div>
             </div>

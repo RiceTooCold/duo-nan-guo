@@ -10,7 +10,7 @@ interface ScoreBubbleProps {
 export function ScoreBubble({ score, direction }: ScoreBubbleProps) {
   return (
     <div className={`game-score-bubble ${direction}`}>
-      <motion.span 
+      <motion.span
         className="text-lg text-[#333]"
         key={score}
         initial={{ scale: 1.2 }}

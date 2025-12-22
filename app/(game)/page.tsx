@@ -1,10 +1,30 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { useSession } from 'next-auth/react'
 import { Avatar } from '@/components/game/Avatar'
+import { Lock, Gamepad2, Settings, X } from 'lucide-react'
 
 export default function HomePage() {
+  const { data: session } = useSession()
+  const router = useRouter()
+  const [showAdminModal, setShowAdminModal] = useState(false)
+  const [adminPassword, setAdminPassword] = useState('')
+  const [passwordError, setPasswordError] = useState(false)
+
+  const handleAdminAccess = () => {
+    // Check password (from environment variable)
+    if (adminPassword === process.env.NEXT_PUBLIC_ADMIN_PASSWORD) {
+      router.push('/admin')
+    } else {
+      setPasswordError(true)
+      setTimeout(() => setPasswordError(false), 2000)
+    }
+  }
+
   return (
     <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-12 bg-gradient-to-b from-white via-[#D5E3F7]/30 to-[#A9C4EB]/20 relative overflow-hidden">
       {/* Background decorative elements */}
@@ -116,23 +136,36 @@ export default function HomePage() {
         ))}
       </motion.div>
 
-      {/* CTA Button */}
+      {/* CTA Buttons */}
       <motion.div
-        className="w-full max-w-xs z-10"
+        className="w-full max-w-xs z-10 flex flex-col gap-3"
         initial={{ opacity: 0, y: 30 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.6 }}
       >
-        <Link href="/login">
+        {/* Play Game Button */}
+        <Link href={session ? "/room" : "/login"}>
           <motion.button
-            className="game-btn game-btn-primary w-full py-4 text-lg shadow-lg"
+            className="game-btn game-btn-primary w-full py-4 text-lg shadow-lg flex items-center justify-center gap-2"
             style={{ boxShadow: '0 10px 25px -5px rgba(91, 139, 212, 0.3)' }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            開始學習 / 登入
+            <Gamepad2 className="w-5 h-5" />
+            {session ? '開始遊戲' : '登入 / 開始遊戲'}
           </motion.button>
         </Link>
+
+        {/* Admin Button */}
+        <motion.button
+          onClick={() => setShowAdminModal(true)}
+          className="game-btn game-btn-secondary w-full py-3 text-base flex items-center justify-center gap-2"
+          whileHover={{ scale: 1.02 }}
+          whileTap={{ scale: 0.98 }}
+        >
+          <Settings className="w-4 h-4" />
+          管理後台
+        </motion.button>
       </motion.div>
 
       {/* Footer text */}
@@ -144,6 +177,71 @@ export default function HomePage() {
       >
         JLPT · TOEIC · TOPIK · HSK
       </motion.p>
+
+      {/* Admin Password Modal */}
+      <AnimatePresence>
+        {showAdminModal && (
+          <motion.div
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowAdminModal(false)}
+          >
+            <motion.div
+              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-[#333] flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-[#5B8BD4]" />
+                  管理員登入
+                </h2>
+                <button
+                  onClick={() => setShowAdminModal(false)}
+                  className="text-[#64748b] hover:text-[#333]"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <input
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleAdminAccess()}
+                  placeholder="輸入管理員密碼"
+                  className={`game-input w-full ${passwordError ? 'border-red-400 animate-shake' : ''}`}
+                  autoFocus
+                />
+
+                {passwordError && (
+                  <motion.p
+                    className="text-red-500 text-sm"
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    密碼錯誤，請重試
+                  </motion.p>
+                )}
+
+                <motion.button
+                  onClick={handleAdminAccess}
+                  className="game-btn game-btn-primary w-full py-3"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  進入後台
+                </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
