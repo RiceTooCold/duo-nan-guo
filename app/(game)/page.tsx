@@ -82,14 +82,13 @@ export default function HomePage() {
           animate={{ y: [0, -12, 0] }}
           transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
         >
-          <div className="w-full h-full rounded-full bg-gradient-to-br from-[#D5E3F7] to-[#A9C4EB]/40 shadow-2xl flex items-center justify-center border-4 border-white">
-            <Avatar
-              src="/mascot-parrot.jpg"
-              alt="DunNanGuo Parrot Mascot"
-              fallback="🦜"
-              size="lg"
-            />
-          </div>
+          <img
+            src="/mascot-parrot-crying.png"
+            alt="DunNanGuo Parrot Mascot"
+            width={200}
+            height={200}
+            className="w-full h-full object-cover"
+          />
         </motion.div>
 
         {/* Sparkle effects around mascot */}

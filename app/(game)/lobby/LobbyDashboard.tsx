@@ -98,15 +98,6 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
 
                         {/* Actions (Settings & Logout) */}
                         <div className="shrink-0 self-start -mt-1 -mr-1 flex flex-col items-center gap-1">
-                            <Link href="/settings">
-                                <motion.button
-                                    className="p-2 bg-white/50 hover:bg-white rounded-full transition-colors"
-                                    whileHover={{ rotate: 90 }}
-                                    whileTap={{ scale: 0.9 }}
-                                >
-                                    <Settings className="w-4 h-4 text-[#64748b]" />
-                                </motion.button>
-                            </Link>
 
                             <motion.button
                                 onClick={handleSignOut}

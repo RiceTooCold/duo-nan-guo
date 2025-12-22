@@ -114,7 +114,7 @@ export default function RoomPage() {
         <h1 className="text-lg font-bold text-[#333]">開設房間</h1>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-4 py-6 pb-28 space-y-6">
+      <div className="flex-1 px-4 py-6 pb-28 space-y-6">
         {/* Language Selection */}
         <section>
           <h2 className="text-sm font-semibold text-[#64748b] mb-3">選擇語言</h2>

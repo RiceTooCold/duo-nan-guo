@@ -39,10 +39,10 @@ const BOT_USERS = [
         },
     },
     {
-        name: 'Gemini Bot',
-        email: 'bot-gemini@duo-nan-guo.local',
+        name: 'GPT-4o-mini Bot',
+        email: 'bot-gpt4o-mini@duo-nan-guo.local',
         isBot: true,
-        botModel: 'gemini-2.0-flash',
+        botModel: 'gpt-4o-mini',
         role: UserRole.user,
         stats: {
             totalMatches: 0,

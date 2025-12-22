@@ -222,7 +222,7 @@ type MatchPlayer {
   name          String
   avatar        String?
   isBot         Boolean  @default(false)
-  botType       String?                // "rule" | "llm" (null for humans)
+  botModel      String?                // e.g., "gpt-4o-mini", "llama-3.3-70b-versatile"
   finalScore    Int      @default(0)
 }
 
