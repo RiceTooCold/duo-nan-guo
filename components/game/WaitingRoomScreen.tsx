@@ -22,13 +22,15 @@ interface WaitingRoomScreenProps {
     mode: 'bot' | 'player'
     userName?: string | null
     userAvatar?: string | null
+    botName?: string | null  // Selected bot name
+    botModel?: string | null // Selected bot model
     onStart: () => Promise<void>  // Now async to allow match creation
     onCancel?: () => void  // 取消回到設定
 }
 
 const TAUNTS = ['😂', '😎', '🔥', '💩', '😠', '🙏']
 
-export function WaitingRoomScreen({ language, level, count, mode, userName, userAvatar, onStart, onCancel }: WaitingRoomScreenProps) {
+export function WaitingRoomScreen({ language, level, count, mode, userName, userAvatar, botName, botModel, onStart, onCancel }: WaitingRoomScreenProps) {
     const [status, setStatus] = useState<'searching' | 'waiting' | 'starting'>('searching')
     const [players, setPlayers] = useState<Player[]>([
         {
@@ -49,7 +51,13 @@ export function WaitingRoomScreen({ language, level, count, mode, userName, user
         if (status === 'searching') {
             const timer = setTimeout(() => {
                 const opponent: Player = mode === 'bot'
-                    ? { id: 'bot', name: 'RiceBot', avatar: '/mascot-robot.jpg', fallback: '🤖', isReady: true }
+                    ? {
+                        id: 'bot',
+                        name: botName || 'Bot',
+                        avatar: '/mascot-robot.jpg',
+                        fallback: '🤖',
+                        isReady: true
+                    }
                     : { id: 'other', name: '對手玩家', avatar: '', fallback: '👤', isReady: false }
 
                 setPlayers(prev => [...prev, opponent])
@@ -57,7 +65,7 @@ export function WaitingRoomScreen({ language, level, count, mode, userName, user
             }, 2000)
             return () => clearTimeout(timer)
         }
-    }, [status, mode])
+    }, [status, mode, botName])
 
     // 2. Bot auto-ready or simulate opponent ready
     useEffect(() => {

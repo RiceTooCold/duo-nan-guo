@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 
 interface OptionCardProps {
   id: string
@@ -54,7 +55,12 @@ export function OptionCard({
             className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#5B8BD4] bg-white flex items-center justify-center text-xs"
           >
             {selfBadge.avatar ? (
-              <img src={selfBadge.avatar} alt="You" className="w-full h-full object-cover" />
+              <Image src={selfBadge.avatar}
+                alt="You"
+                className="w-full h-full object-cover"
+                width={24}
+                height={24}
+              />
             ) : (
               <span>{selfBadge.fallback}</span>
             )}
@@ -67,7 +73,12 @@ export function OptionCard({
             className="w-6 h-6 rounded-full overflow-hidden border-2 border-[#ef4444] bg-white flex items-center justify-center text-xs"
           >
             {opponentBadge.avatar ? (
-              <img src={opponentBadge.avatar} alt="Opponent" className="w-full h-full object-cover" />
+              <Image src={opponentBadge.avatar}
+                alt="Opponent"
+                className="w-full h-full object-cover"
+                width={24}
+                height={24}
+              />
             ) : (
               <span>{opponentBadge.fallback}</span>
             )}

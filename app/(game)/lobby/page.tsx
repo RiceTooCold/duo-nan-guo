@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getUserDashboardStats } from '@/actions/game.server'
+import { getUserDashboardStats } from '@/actions/user.server'
 import LobbyDashboard from './LobbyDashboard'
 
 export default async function LobbyPage() {

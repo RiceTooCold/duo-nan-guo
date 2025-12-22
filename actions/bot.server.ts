@@ -63,24 +63,16 @@ D) ${options.d}
 Reply with ONLY the letter (A, B, C, or D) that you think is correct. No explanation.`;
 
         // 3. Call Gemini with logging
-        console.log(`🤖 [LLM Bot] Calling Gemini for question: "${question.stimulus.substring(0, 100)}..." (difficulty: ${botDifficulty})`);
         const startTime = Date.now();
 
         const result = await botModel.generateContent(prompt);
         const response = result.response.text().trim().toUpperCase();
 
         const apiTime = Date.now() - startTime;
-        console.log(`🤖 [LLM Bot] Gemini responded in ${apiTime}ms: "${response}"`);
 
         // 4. Parse response
         const answerMatch = response.match(/^[ABCD]/);
         const answer = answerMatch ? answerMatch[0].toLowerCase() : getRandomAnswer();
-
-        if (!answerMatch) {
-            console.warn(`🤖 [LLM Bot] Could not parse answer from response, using random: ${answer}`);
-        } else {
-            console.log(`🤖 [LLM Bot] Final answer: ${answer.toUpperCase()}`);
-        }
 
         // 5. Simulate thinking time based on difficulty
         const thinkingMs = getThinkingTime(botDifficulty);

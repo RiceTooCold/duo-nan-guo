@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, CheckCircle, XCircle, Trophy, Target, Minus } from 'lucide-react'
-import { getMatchDetail, type MatchDetail } from '@/actions/game.server'
+import { getMatchDetail, type MatchDetail } from '@/actions/user.server'
 
 const languageInfo: Record<string, { flag: string; name: string }> = {
     JP: { flag: '🇯🇵', name: '日文' },

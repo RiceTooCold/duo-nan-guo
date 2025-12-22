@@ -9,11 +9,10 @@ import { ScoreBubble } from '@/components/game/ScoreBubble'
 import { BatteryScore } from '@/components/game/BatteryScore'
 import { OptionCard } from '@/components/game/OptionCard'
 import { BattleIntro } from '@/components/game/BattleIntro'
-import { useGameLoop } from '@/lib/game-engine/useGameLoop'
-import { useBot } from '@/lib/game-engine/useBot'
-import { useGameResultStore } from '@/lib/game-engine/useGameResultStore'
+import { useGameClient } from '@/lib/game-engine/useGameClient'
 import { GamePhase, type ClientQuestion } from '@/types/game'
 import { rankToLevel } from '@/lib/config/game'
+import { TargetLanguage } from '@/generated/prisma'
 
 const languageLabels: Record<string, string> = {
   JP: '日文',
@@ -27,127 +26,64 @@ function BattleContent() {
   const router = useRouter()
 
   // Get matchId from URL (set by RoomPage after creating match)
-  const matchId = searchParams.get('matchId')
+  const matchId = searchParams.get('matchId') || ''
 
-  // Use the game loop hook
-  const { state, initGame, startRound, handleAnswer, handleBotAnswer } = useGameLoop()
+  // Use the server-authoritative game client hook
+  // For now, use 'player_1' as selfPlayerId (human player)
+  // TODO: Get actual playerId from session after login integration
+  const selfPlayerId = 'player_1'
 
-  // Derived state
-  const currentQuestion = state.session?.questions[state.currentQuestionIndex] as ClientQuestion | undefined
-  const totalQuestions = state.session?.questions.length || 10
-  const selfState = state.self
-  const opponentState = state.opponent
+  const {
+    view,
+    session,
+    isLoading,
+    error: hookError,
+    timeLeft,
+    currentQuestion,
+    selfAnswered,
+    opponentAnswered,
+    handleAnswer,
+  } = useGameClient(matchId, selfPlayerId)
+
+  // Derived state from view
+  const totalQuestions = session?.questions.length || 10
+  const selfState = view?.self || null
+  const opponentState = view?.opponent || null
 
   // Get language and rank from session (loaded from match)
-  const langParam = state.session?.targetLanguage || 'JP'
-  const rankParam = state.session?.rank || 1
+  const langParam = session?.targetLanguage || 'JP'
+  const rankParam = session?.rank || 1
 
-  // Use the bot hook
-  useBot({
-    phase: state.phase,
-    currentQuestion,
-    onAnswer: handleBotAnswer,
-    isEnabled: true,
-    matchId: state.session?.matchId,
-  })
-
-  // --- TRANSITION LOGIC (Inlined) ---
-  const showIntro = state.phase === GamePhase.READY && state.currentQuestionIndex === 0
-  const isRevealing = state.phase === GamePhase.READY && state.currentQuestionIndex > 0
-
-  // Auto-start round after Reveal animation (1.5s delay) for Q2+
-  useEffect(() => {
-    if (isRevealing) {
-      const timer = setTimeout(() => {
-        startRound();
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [isRevealing, startRound]);
-  // ----------------------------------
-
-
-  // Initialize game on mount using matchId
-  useEffect(() => {
-    if (matchId) {
-      initGame(matchId)
-    }
-  }, [matchId, initGame])
-
-  // Get setResult from store
-  const setResult = useGameResultStore((s) => s.setResult)
+  // --- TRANSITION LOGIC ---
+  const showIntro = view?.phase === GamePhase.READY && (view?.currentQuestionIndex ?? 0) === 0
+  const isRevealing = view?.phase === GamePhase.READY && (view?.currentQuestionIndex ?? 0) > 0
 
   // Navigate to results when game is finished
+  // Result will be fetched from server on results page
   useEffect(() => {
-    if (state.phase === GamePhase.FINISHED && state.session) {
-      const levelLabel = rankToLevel(langParam as any, rankParam)
-      const playerScore = selfState?.score || 0
-      const botScore = opponentState?.score || 0
-
-      // Calculate correct answers (score / 10 since each correct = 10 points)
-      const playerCorrectAnswers = Math.floor(playerScore / 10)
-      const playerAccuracy = totalQuestions > 0 ? Math.round((playerCorrectAnswers / totalQuestions) * 100) : 0
-
-      const opponentCorrectAnswers = Math.floor(botScore / 10)
-      const opponentAccuracy = totalQuestions > 0 ? Math.round((opponentCorrectAnswers / totalQuestions) * 100) : 0
-
-      // Explicit outcome determination (fixes bug where loss was shown as tie)
-      const outcome = state.winnerId === 'self' ? 'win' as const
-        : state.winnerId === 'opponent' ? 'lose' as const
-          : 'tie' as const;
-
-      // Store result in Zustand for instant display
-      setResult({
-        matchId: state.session.matchId,
-        outcome,
-        self: {
-          id: selfState?.id || 'player_1',
-          name: selfState?.name || 'You',
-          score: playerScore,
-          avatar: selfState?.avatar,
-          isBot: false,
-          correctAnswers: playerCorrectAnswers,
-          accuracy: playerAccuracy,
-          maxStreak: selfState?.maxStreak || 0,
-        },
-        opponent: {
-          id: opponentState?.id || 'opponent',
-          name: opponentState?.name || 'Opponent',
-          score: botScore,
-          avatar: opponentState?.avatar,
-          isBot: opponentState?.isBot || false,
-          correctAnswers: opponentCorrectAnswers,
-          accuracy: opponentAccuracy,
-          maxStreak: opponentState?.maxStreak || 0,
-        },
-        match: {
-          totalQuestions,
-          language: langParam,
-          level: levelLabel,
-        },
-      })
-
-      router.push('/battle/results')
+    if (view?.phase === GamePhase.FINISHED && matchId) {
+      router.push(`/battle/results?matchId=${matchId}`)
     }
-  }, [state.phase, state.winnerId, state.session, selfState, opponentState, totalQuestions, langParam, rankParam, router, setResult])
+  }, [view?.phase, matchId, router])
 
   // Determine option state for UI
   // During PLAYING: show own result immediately (correct/incorrect on selected)
   // During RESOLVING: reveal correct answer + all selections
   const getOptionState = (optionId: string): 'default' | 'selected' | 'correct' | 'incorrect' => {
-    const isResolvingOrFinished = state.phase === GamePhase.RESOLVING || state.phase === GamePhase.FINISHED
+    if (!view) return 'default'
+    const isResolvingOrFinished = view.phase === GamePhase.RESOLVING || view.phase === GamePhase.FINISHED
 
     // RESOLVING/FINISHED: Full reveal
     if (isResolvingOrFinished) {
-      if (optionId === state.correctAnswer) return 'correct'
-      if (state.selfAnswer === optionId && optionId !== state.correctAnswer) return 'incorrect'
+      if (optionId === view.correctAnswer) return 'correct'
+      if (view.self.answer === optionId && optionId !== view.correctAnswer) return 'incorrect'
       return 'default'
     }
 
     // PLAYING: Self sees their own result immediately
-    if (state.selfAnswer === optionId) {
+    if (view.self.answer === optionId) {
       // Show correct/incorrect based on selfIsCorrect
-      return state.selfIsCorrect ? 'correct' : 'incorrect'
+      return view.self.isCorrect ? 'correct' : 'incorrect'
     }
 
     return 'default'
@@ -156,15 +92,15 @@ function BattleContent() {
 
 
   // Error state
-  if (state.error) {
+  if (hookError) {
     let title = '😿';
-    let message = state.error;
-    let buttonText = '返回首頁';
+    let message = hookError;
+    const buttonText = '返回首頁';
 
-    if (state.error === 'MATCH_FINISHED') {
+    if (hookError === 'MATCH_FINISHED') {
       title = '🏁';
       message = '此對戰已結束';
-    } else if (state.error === 'MATCH_EXPIRED') {
+    } else if (hookError === 'MATCH_EXPIRED') {
       title = '⏰';
       message = '對戰資料已過期';
     }
@@ -185,8 +121,8 @@ function BattleContent() {
     )
   }
 
-  // Loading state (IDLE or IDLE->READY transition)
-  if (state.phase === GamePhase.IDLE) {
+  // Loading state
+  if (isLoading || !view) {
     return (
       <div className="min-h-dvh flex items-center justify-center bg-white">
         <div className="text-center">
@@ -204,7 +140,7 @@ function BattleContent() {
         <div className="text-center">
           <div className="text-6xl mb-4">🐛</div>
           <p className="text-[#ef4444] font-bold mb-4">資料異常：找不到題目</p>
-          <p className="text-sm text-gray-500 mb-4">Phase: {state.phase}, QIndex: {state.currentQuestionIndex}</p>
+          <p className="text-sm text-gray-500 mb-4">Phase: {view.phase}, QIndex: {view.currentQuestionIndex}</p>
           <button
             onClick={() => window.location.reload()}
             className="px-6 py-2 bg-[#5B8BD4] text-white rounded-xl font-bold"
@@ -218,8 +154,8 @@ function BattleContent() {
 
 
 
-  const isShowingResult = state.phase === GamePhase.RESOLVING
-  const canProceed = isShowingResult && state.opponentAnswered
+  const isShowingResult = view.phase === GamePhase.RESOLVING
+  const canProceed = isShowingResult && opponentAnswered
 
   return (
     <div
@@ -230,12 +166,12 @@ function BattleContent() {
         {showIntro && (
           <BattleIntro
             language={languageLabels[langParam as string] || (langParam as string)}
-            level={rankToLevel(langParam as any, rankParam as number)}
+            level={rankToLevel(langParam as TargetLanguage, rankParam as number)}
             playerAvatar={selfState?.avatar}
             opponentAvatar={opponentState?.avatar}
             playerName={selfState?.name || 'You'}
             opponentName={opponentState?.name || 'Opponent'}
-            onComplete={startRound}
+            onComplete={() => { }}
           />
         )}
       </AnimatePresence>
@@ -246,7 +182,7 @@ function BattleContent() {
           className="text-2xl font-bold text-center text-[#333]"
           animate={{ opacity: 1, y: 0 }}
         >
-          {languageLabels[langParam as string] || langParam} {rankToLevel(langParam as any, rankParam)}
+          {languageLabels[langParam as string] || langParam} {rankToLevel(langParam as TargetLanguage, rankParam)}
         </motion.h1>
       </header>
 
@@ -255,16 +191,16 @@ function BattleContent() {
         {/* Progress & Timer */}
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold text-[#5B8BD4]">Q{state.currentQuestionIndex + 1}</span>
+            <span className="text-2xl font-bold text-[#5B8BD4]">Q{view.currentQuestionIndex + 1}</span>
             <span className="text-[#64748b] text-sm">/ {totalQuestions}</span>
           </div>
           <motion.div
-            className={`px-3 py-1 rounded-full font-bold ${state.timeLeft <= 5 ? 'bg-[#fee2e2] text-[#ef4444]' : 'bg-[#D5E3F7] text-[#333]'
+            className={`px-3 py-1 rounded-full font-bold ${timeLeft <= 5 ? 'bg-[#fee2e2] text-[#ef4444]' : 'bg-[#D5E3F7] text-[#333]'
               }`}
-            animate={state.timeLeft <= 5 && state.phase === GamePhase.PLAYING ? { scale: [1, 1.1, 1] } : {}}
+            animate={timeLeft <= 5 && view.phase === GamePhase.PLAYING ? { scale: [1, 1.1, 1] } : {}}
             transition={{ repeat: Infinity, duration: 0.5 }}
           >
-            {state.timeLeft}s
+            {timeLeft}s
           </motion.div>
         </div>
 
@@ -272,7 +208,7 @@ function BattleContent() {
         <div className="relative">
           <AnimatePresence mode="wait">
             <motion.p
-              key={`q-${state.currentQuestionIndex}`}
+              key={`q-${view.currentQuestionIndex}`}
               className="text-lg font-medium text-[#333] leading-relaxed"
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
@@ -289,7 +225,7 @@ function BattleContent() {
         <div className="grid grid-cols-1 gap-3">
           {Object.entries(currentQuestion.options).map(([key, value], index) => (
             <motion.div
-              key={`q${state.currentQuestionIndex}-${key}`}
+              key={`q${view.currentQuestionIndex}-${key}`}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.15, duration: 0.3 }}
             >
@@ -297,14 +233,14 @@ function BattleContent() {
                 id={key}
                 text={value as string}
                 state={getOptionState(key)}
-                disabled={isRevealing || isShowingResult || state.selfAnswered}
+                disabled={isRevealing || isShowingResult || selfAnswered}
                 index={index}
                 onClick={() => handleAnswer(key)}
-                selfBadge={state.selfAnswer === key ? {
+                selfBadge={view.self.answer === key ? {
                   avatar: selfState?.avatar,
                   fallback: selfState?.name?.charAt(0) || '🦜'
                 } : null}
-                opponentBadge={isShowingResult && state.opponentAnswer === key ? {
+                opponentBadge={isShowingResult && view.opponent.answer === key ? {
                   avatar: opponentState?.avatar,
                   fallback: opponentState?.isBot ? '🤖' : (opponentState?.name?.charAt(0) || 'O')
                 } : null}
@@ -350,15 +286,18 @@ function BattleContent() {
             />
             {/* Status Bubbles for Player */}
             <div className="absolute -top-8 -right-4 min-w-[80px]">
-              {state.phase === GamePhase.PLAYING && !state.selfAnswered && (
+              {view.phase === GamePhase.PLAYING && !selfAnswered && (
                 <StatusBubble text="等待作答..." variant="waiting" direction="left" />
               )}
-              {(state.phase === GamePhase.PLAYING || state.phase === GamePhase.RESOLVING) && state.selfAnswered && (
+              {(view.phase === GamePhase.PLAYING || view.phase === GamePhase.RESOLVING) && selfAnswered && (
                 <StatusBubble
-                  text={state.selfIsCorrect ? '正確!' : '錯誤...'}
-                  variant={state.selfIsCorrect ? 'correct' : 'incorrect'}
+                  text={view.self.isCorrect ? '正確!' : '錯誤...'}
+                  variant={view.self.isCorrect ? 'correct' : 'incorrect'}
                   direction="left"
                 />
+              )}
+              {view.phase === GamePhase.RESOLVING && !selfAnswered && (
+                <StatusBubble text="超時!" variant="timeout" direction="left" />
               )}
             </div>
           </div>
@@ -384,15 +323,18 @@ function BattleContent() {
             />
             {/* Status Bubbles for Bot */}
             <div className="absolute -top-8 -left-2 min-w-[80px]">
-              {state.phase === GamePhase.PLAYING && !state.opponentAnswered && (
+              {view.phase === GamePhase.PLAYING && !opponentAnswered && (
                 <StatusBubble text="思考中..." variant="thinking" direction="right" />
               )}
-              {(state.phase === GamePhase.PLAYING || state.phase === GamePhase.RESOLVING) && state.opponentAnswered && (
+              {(view.phase === GamePhase.PLAYING || view.phase === GamePhase.RESOLVING) && opponentAnswered && (
                 <StatusBubble
-                  text={state.opponentIsCorrect ? '正確!' : '錯誤...'}
-                  variant={state.opponentIsCorrect ? 'correct' : 'incorrect'}
+                  text={view.opponent.isCorrect ? '正確!' : '錯誤...'}
+                  variant={view.opponent.isCorrect ? 'correct' : 'incorrect'}
                   direction="right"
                 />
+              )}
+              {view.phase === GamePhase.RESOLVING && !opponentAnswered && (
+                <StatusBubble text="超時!" variant="timeout" direction="right" />
               )}
             </div>
           </div>

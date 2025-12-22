@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { Trophy, History, User, Sword, MessageCircle, Settings, LogOut, ChartNoAxesCombined, Flame, Crosshair, Zap, Gamepad } from 'lucide-react'
 import { Avatar } from '@/components/game/Avatar'
 import { signOut } from 'next-auth/react'
-import type { UserDashboardStats } from '@/actions/game.server'
+import type { UserDashboardStats } from '@/actions/user.server'
 import type { Session } from 'next-auth'
 
 interface LobbyDashboardProps {

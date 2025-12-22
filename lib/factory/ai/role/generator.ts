@@ -3,6 +3,7 @@ import { ExamQuestionType, TargetLanguage } from '@/generated/prisma'
 import { generatorModel } from '@/lib/factory/ai/gemini'
 import { getPromptConfig, getRandomTopic } from '@/lib/factory/ai/prompts'
 import { rateLimiter } from '@/lib/factory/utils/rate-limiter'
+import { getPercentageMapForRank, getQuestionTypeValuesForRank } from '@/lib/config/factory'
 
 // Zod schema for validating generated questions
 export const GeneratedQuestionSchema = z.object({
@@ -513,7 +514,7 @@ export function createGenerationPlan(
     rank: number,
     totalCount: number
 ): QuestionPlan[] {
-    const { getPercentageMapForRank, getQuestionTypeValuesForRank } = require('@/lib/config/factory')
+
 
     const percentages = getPercentageMapForRank(targetLanguage, rank)
     const types = getQuestionTypeValuesForRank(targetLanguage, rank)

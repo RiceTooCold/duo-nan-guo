@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Calendar, ChevronRight, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react'
-import { getUserMatchHistory, type MatchHistoryItem } from '@/actions/game.server'
+import { getUserMatchHistory, type MatchHistoryItem } from '@/actions/user.server'
 
 const languageInfo: Record<string, { flag: string; name: string }> = {
     JP: { flag: '🇯🇵', name: '日文' },

@@ -1,13 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, Users, Bot } from 'lucide-react'
+import { ArrowLeft, Users, Bot, Check } from 'lucide-react'
 import { WaitingRoomScreen } from '@/components/game/WaitingRoomScreen'
-import { createMatch } from '@/actions/game.server'
+import { createMatch, getBotUsers, type BotUserInfo } from '@/actions/game.server'
 import { gameLanguages, questionCounts, levelToRank, type GameLanguageConfig } from '@/lib/config/game'
 import type { TargetLanguage } from '@/generated/prisma'
 
@@ -26,7 +26,23 @@ export default function RoomPage() {
   const [selectedCount, setSelectedCount] = useState(10)
   const [opponent, setOpponent] = useState<'bot' | 'player'>('bot')
 
-  const isReady = selectedLanguage && selectedLevel && selectedCount
+  // Bot selection
+  const [botUsers, setBotUsers] = useState<BotUserInfo[]>([])
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null)
+
+  // Fetch bot users on mount
+  useEffect(() => {
+    const fetchBots = async () => {
+      const bots = await getBotUsers()
+      setBotUsers(bots)
+      if (bots.length > 0) {
+        setSelectedBotId(bots[0].id) // Default to first bot
+      }
+    }
+    fetchBots()
+  }, [])
+
+  const isReady = selectedLanguage && selectedLevel && selectedCount && (opponent === 'player' || selectedBotId)
 
   // When "開始對戰" is clicked, transition to waiting phase
   const handleStartBattle = () => {
@@ -43,12 +59,16 @@ export default function RoomPage() {
       // Convert level label to rank number
       const rank = levelToRank(selectedLanguage.id, selectedLevel)
 
-      // Create match on server with real user ID
-      const { matchId } = await createMatch(session?.user?.id || null, {
-        lang: selectedLanguage.id as TargetLanguage,
-        rank,
-        count: selectedCount,
-      })
+      // Create match on server with real user ID and selected bot
+      const { matchId } = await createMatch(
+        session?.user?.id || null,
+        {
+          lang: selectedLanguage.id as TargetLanguage,
+          rank,
+          count: selectedCount,
+        },
+        opponent === 'bot' ? (selectedBotId || undefined) : undefined
+      )
 
       // Navigate to battle with matchId
       router.push(`/battle?matchId=${matchId}`)
@@ -58,6 +78,9 @@ export default function RoomPage() {
       setRoomPhase('setup')
     }
   }
+
+  // Get selected bot info for display
+  const selectedBot = botUsers.find(b => b.id === selectedBotId)
 
   // Render WaitingRoom phase
   if (roomPhase === 'waiting' && selectedLanguage && selectedLevel) {
@@ -69,6 +92,8 @@ export default function RoomPage() {
         mode={opponent}
         userName={session?.user?.name}
         userAvatar={session?.user?.image}
+        botName={selectedBot?.name}
+        botModel={selectedBot?.botModel}
         onStart={handleWaitingComplete}
         onCancel={() => setRoomPhase('setup')}
       />
@@ -167,7 +192,7 @@ export default function RoomPage() {
 
         {/* Opponent Selection */}
         <section>
-          <h2 className="text-sm font-semibold text-[#64748b] mb-3">對手</h2>
+          <h2 className="text-sm font-semibold text-[#64748b] mb-3">對手類型</h2>
           <div className="flex gap-3">
             <motion.button
               onClick={() => setOpponent('bot')}
@@ -197,6 +222,43 @@ export default function RoomPage() {
             </motion.button>
           </div>
         </section>
+
+        {/* Bot Selection (when bot mode selected) */}
+        {opponent === 'bot' && botUsers.length > 0 && (
+          <motion.section
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+          >
+            <h2 className="text-sm font-semibold text-[#64748b] mb-3">選擇 Bot</h2>
+            <div className="grid grid-cols-3 gap-2">
+              {botUsers.map((bot) => (
+                <motion.button
+                  key={bot.id}
+                  onClick={() => setSelectedBotId(bot.id)}
+                  className={`p-3 rounded-xl border-2 transition-all flex flex-col items-center gap-1 relative ${selectedBotId === bot.id
+                    ? 'border-[#5B8BD4] bg-[#D5E3F7]'
+                    : 'border-[#D5E3F7] bg-white hover:bg-[#D5E3F7]'
+                    }`}
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {selectedBotId === bot.id && (
+                    <div className="absolute top-1 right-1 w-4 h-4 bg-[#5B8BD4] rounded-full flex items-center justify-center">
+                      <Check className="w-3 h-3 text-white" />
+                    </div>
+                  )}
+                  <span className="text-xl">🤖</span>
+                  <span className="font-semibold text-[#333] text-xs truncate w-full text-center">
+                    {bot.name.replace(' Bot', '')}
+                  </span>
+                  <span className="text-[10px] text-[#64748b] truncate w-full text-center">
+                    {bot.botModel?.split('-')[0] || 'LLM'}
+                  </span>
+                </motion.button>
+              ))}
+            </div>
+          </motion.section>
+        )}
 
         {/* Room Summary */}
         {isReady && (

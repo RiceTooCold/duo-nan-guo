@@ -202,6 +202,10 @@ model Match {
   // State
   status          MatchStatus    @default(waiting)
   winnerId        String?        @db.ObjectId
+  isTie           Boolean        @default(false)
+  
+  // Live game state (for in-progress games)
+  liveState       Json?          // GameState object with endTime
   
   // Timestamps
   startedAt       DateTime?

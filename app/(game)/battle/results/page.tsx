@@ -1,17 +1,52 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Trophy, Target, Zap, RotateCcw, Home } from 'lucide-react'
 import confetti from 'canvas-confetti'
 import { Avatar } from '@/components/game/Avatar'
-import { useGameResultStore } from '@/lib/game-engine/useGameResultStore'
+import { getMatchResult } from '@/actions/game.server'
+import type { GameResult } from '@/types/game'
 
-export default function ResultsPage() {
+function LoadingFallback() {
+  return (
+    <div className="min-h-dvh flex flex-col items-center justify-center bg-[#F5F8FC] p-4">
+      <div className="w-16 h-16 border-4 border-[#5B8BD4] border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-[#64748b]">載入對戰結果...</p>
+    </div>
+  )
+}
+
+function ResultsContent() {
   const router = useRouter()
-  const result = useGameResultStore((s) => s.result)
+  const searchParams = useSearchParams()
+  const matchId = searchParams.get('matchId')
+
+  const [result, setResult] = useState<GameResult | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [showStats, setShowStats] = useState(false)
+
+  // Fetch result from server
+  useEffect(() => {
+    if (!matchId) {
+      setIsLoading(false)
+      return
+    }
+
+    const fetchResult = async () => {
+      try {
+        const data = await getMatchResult(matchId)
+        setResult(data)
+      } catch (error) {
+        console.error('Failed to fetch result:', error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchResult()
+  }, [matchId])
 
   useEffect(() => {
     if (!result) return
@@ -60,11 +95,16 @@ export default function ResultsPage() {
     router.push('/lobby')
   }
 
+  // Loading state
+  if (isLoading) {
+    return <LoadingFallback />
+  }
+
   // No result state - direct navigation without playing
   if (!result) {
     return (
       <div className="min-h-dvh flex flex-col items-center justify-center bg-[#F5F8FC] p-4">
-        <p className="text-[#64748b] mb-4">尚無對戰結果</p>
+        <p className="text-[#64748b] mb-4">找不到對戰結果</p>
         <button
           onClick={() => router.push('/room')}
           className="text-[#5B8BD4] font-semibold"
@@ -78,201 +118,176 @@ export default function ResultsPage() {
   // Outcome display config
   const outcomeConfig = {
     win: {
-      emoji: '🎉',
-      title: '勝利！',
-      subtitle: '太棒了！你贏得了這場對戰！',
-      animation: { rotate: [0, -10, 10, -10, 0] },
+      title: '🏆 勝利！',
+      subtitle: '恭喜你贏得比賽！',
+      bgGradient: 'from-[#E0F2E9] to-[#D5E3F7]',
+      textColor: 'text-[#22c55e]'
     },
     lose: {
-      emoji: '💪',
-      title: '再接再厲！',
-      subtitle: '別灰心，下次一定能贏！',
-      animation: { y: [0, -10, 0] },
+      title: '😢 可惜...',
+      subtitle: '再接再厲！',
+      bgGradient: 'from-[#FEE2E2] to-[#FDE2E4]',
+      textColor: 'text-[#ef4444]'
     },
     tie: {
-      emoji: '🤝',
-      title: '平手！',
-      subtitle: '勢均力敵！真是一場精彩的對決！',
-      animation: { scale: [1, 1.1, 1] },
-    },
+      title: '🤝 平手！',
+      subtitle: '勢均力敵的對決！',
+      bgGradient: 'from-[#FEF3C7] to-[#FDE68A]',
+      textColor: 'text-[#f59e0b]'
+    }
   }
 
   const config = outcomeConfig[result.outcome]
+  const { self, opponent, match } = result
 
   return (
-    <div className="min-h-dvh flex flex-col bg-linear-to-b from-[#A9C4EB]/30 via-white to-[#D5E3F7]/30 px-4 py-8">
-      {/* Result Title */}
-      <motion.div
-        className="text-center mb-8"
-        initial={{ opacity: 0, scale: 0.5 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ type: 'spring', stiffness: 200 }}
-      >
-        <motion.div
-          className="text-6xl mb-4"
-          animate={config.animation}
-          transition={{ duration: 0.5, delay: 0.3 }}
-        >
-          {config.emoji}
-        </motion.div>
-        <h1 className="text-4xl font-black text-[#333] mb-2">
-          {config.title}
-        </h1>
-        <p className="text-[#64748b]">{config.subtitle}</p>
-      </motion.div>
-
-      {/* Score Comparison - Symmetric self vs opponent */}
-      <motion.div
-        className="game-card p-6 mb-6"
-        initial={{ opacity: 0, y: 20 }}
+    <div className={`min-h-dvh flex flex-col bg-gradient-to-b ${config.bgGradient}`}>
+      {/* Outcome Banner */}
+      <motion.section
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
+        className="pt-12 pb-8 text-center"
       >
-        <div className="flex items-center justify-between">
-          {/* Self (Left) */}
-          <div className="text-center flex-1">
-            <div className="mb-2 flex justify-center">
+        <motion.h1
+          initial={{ scale: 0.5 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', damping: 10 }}
+          className={`text-4xl font-bold ${config.textColor}`}
+        >
+          {config.title}
+        </motion.h1>
+        <p className="text-[#64748b] mt-2">{config.subtitle}</p>
+      </motion.section>
+
+      {/* Score Comparison */}
+      <section className="px-4 pb-6">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-white rounded-3xl shadow-lg p-6"
+        >
+          <div className="flex items-center justify-between mb-6">
+            {/* Self */}
+            <div className="flex flex-col items-center w-1/3">
               <Avatar
-                src={result.self.avatar || "/mascot-parrot.jpg"}
-                alt="Player"
-                fallback={result.self.name.charAt(0) || '🦜'}
-                size="md"
+                src={self.avatar || '/mascot-parrot.jpg'}
+                alt={self.name}
+                fallback={self.name.charAt(0)}
+                size="lg"
               />
+              <p className="font-semibold text-[#333] mt-2 text-sm truncate max-w-full">{self.name}</p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="text-2xl font-bold text-[#5B8BD4]"
+              >
+                {self.score}
+              </motion.p>
             </div>
-            <p className="text-sm text-[#64748b] mb-1">{result.self.name}</p>
-            <motion.p
-              className="text-3xl font-black text-[#5B8BD4]"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.5, type: 'spring' }}
-            >
-              {result.self.score}
-            </motion.p>
+
+            {/* VS */}
+            <div className="flex flex-col items-center">
+              <span className="text-[#94a3b8] font-bold text-xl">VS</span>
+            </div>
+
+            {/* Opponent */}
+            <div className="flex flex-col items-center w-1/3">
+              <Avatar
+                src={opponent.avatar || '/mascot-robot.jpg'}
+                alt={opponent.name}
+                fallback={opponent.isBot ? '🤖' : opponent.name.charAt(0)}
+                size="lg"
+                badge={opponent.isBot ? 'ai' : undefined}
+              />
+              <p className="font-semibold text-[#333] mt-2 text-sm truncate max-w-full">{opponent.name}</p>
+              <motion.p
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.5 }}
+                className="text-2xl font-bold text-[#ef4444]"
+              >
+                {opponent.score}
+              </motion.p>
+            </div>
           </div>
 
-          {/* VS */}
-          <div className="px-4">
-            <span className="text-2xl font-bold text-[#64748b]">VS</span>
+          {/* Match Info */}
+          <div className="text-center text-[#94a3b8] text-sm">
+            {match.language} · {match.level} · {match.totalQuestions}題
           </div>
-
-          {/* Opponent (Right) */}
-          <div className="text-center flex-1">
-            <div className="mb-2 flex justify-center">
-              <Avatar
-                src={result.opponent.avatar || "/mascot-robot.jpg"}
-                alt="Opponent"
-                fallback={result.opponent.isBot ? '🤖' : (result.opponent.name.charAt(0) || 'O')}
-                size="md"
-              />
-            </div>
-            <p className="text-sm text-[#64748b] mb-1">{result.opponent.name}</p>
-            <motion.p
-              className="text-3xl font-black text-[#333]/50"
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.6, type: 'spring' }}
-            >
-              {result.opponent.score}
-            </motion.p>
-          </div>
-        </div>
-      </motion.div>
+        </motion.div>
+      </section>
 
       {/* Statistics */}
       <AnimatePresence>
         {showStats && (
-          <motion.div
-            className="space-y-4 mb-8"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="px-4 pb-6 flex-1"
           >
-            {/* Accuracy Progress */}
-            <div className="game-card p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
+            <div className="grid grid-cols-3 gap-3">
+              {/* Accuracy */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-center w-10 h-10 bg-[#D5E3F7] rounded-full mx-auto mb-2">
                   <Target className="w-5 h-5 text-[#5B8BD4]" />
-                  <span className="font-semibold text-[#333]">準確率</span>
                 </div>
-                <span className="text-lg font-bold text-[#5B8BD4]">{result.self.accuracy}%</span>
+                <p className="text-center text-xs text-[#94a3b8]">正確率</p>
+                <p className="text-center text-lg font-bold text-[#333]">{self.accuracy}%</p>
               </div>
-              <div className="h-3 bg-[#D5E3F7] rounded-full overflow-hidden">
-                <motion.div
-                  className="h-full bg-gradient-to-r from-[#5B8BD4] to-[#A9C4EB] rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${result.self.accuracy}%` }}
-                  transition={{ duration: 1, delay: 0.5 }}
-                />
+
+              {/* Correct Answers */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-center w-10 h-10 bg-[#E0F2E9] rounded-full mx-auto mb-2">
+                  <Trophy className="w-5 h-5 text-[#22c55e]" />
+                </div>
+                <p className="text-center text-xs text-[#94a3b8]">答對題數</p>
+                <p className="text-center text-lg font-bold text-[#333]">{self.correctAnswers}/{match.totalQuestions}</p>
               </div>
-              <p className="text-sm text-[#64748b] mt-2">
-                {result.self.correctAnswers} / {result.match.totalQuestions} 正確
-              </p>
-            </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 gap-4">
-              {/* Language */}
-              <motion.div
-                className="game-card p-4 text-center"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <Trophy className="w-8 h-8 text-[#f59e0b] mx-auto mb-2" />
-                <p className="text-2xl font-bold text-[#333]">{result.match.language}</p>
-                <p className="text-xs text-[#64748b]">{result.match.level}</p>
-              </motion.div>
-
-              <motion.div
-                className="game-card p-4 text-center"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.7 }}
-              >
-                <Zap className="w-8 h-8 text-[#ef4444] mx-auto mb-2" />
-                <p className="text-2xl font-bold text-[#333]">{result.self.maxStreak}x</p>
-                <p className="text-xs text-[#64748b]">最高連擊</p>
-              </motion.div>
+              {/* Streak */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-center w-10 h-10 bg-[#FEF3C7] rounded-full mx-auto mb-2">
+                  <Zap className="w-5 h-5 text-[#f59e0b]" />
+                </div>
+                <p className="text-center text-xs text-[#94a3b8]">最高連續</p>
+                <p className="text-center text-lg font-bold text-[#333]">{self.maxStreak}</p>
+              </div>
             </div>
-          </motion.div>
+          </motion.section>
         )}
       </AnimatePresence>
 
       {/* Action Buttons */}
-      <div className="mt-auto space-y-3">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.8 }}
-        >
-          <motion.button
-            onClick={handlePlayAgain}
-            className="game-btn game-btn-primary w-full py-4 text-lg"
-            style={{ boxShadow: '0 10px 25px -5px rgba(91, 139, 212, 0.3)' }}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
-          >
-            <RotateCcw className="w-5 h-5" />
-            再玩一局
-          </motion.button>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.9 }}
-        >
-          <motion.button
+      <section className="p-4 mt-auto">
+        <div className="flex gap-3">
+          <button
             onClick={handleGoHome}
-            className="game-btn game-btn-secondary w-full py-4 text-lg"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            className="flex-1 flex items-center justify-center gap-2 py-4 rounded-xl bg-white text-[#64748b] font-semibold shadow-sm hover:bg-gray-50 transition-colors"
           >
             <Home className="w-5 h-5" />
-            回到主頁
-          </motion.button>
-        </motion.div>
-      </div>
-    </div>
+            首頁
+          </button>
+          <button
+            onClick={handlePlayAgain}
+            className="flex-[2] flex items-center justify-center gap-2 py-4 rounded-xl bg-[#5B8BD4] text-white font-semibold shadow-lg hover:bg-[#4A7AC3] transition-colors"
+          >
+            <RotateCcw className="w-5 h-5" />
+            再玩一次
+          </button>
+        </div>
+      </section>
+    </div >
+  )
+}
+
+export default function ResultsPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ResultsContent />
+    </Suspense>
   )
 }

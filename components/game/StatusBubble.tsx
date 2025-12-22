@@ -4,7 +4,7 @@ import { motion } from 'framer-motion'
 
 interface StatusBubbleProps {
     text: string
-    variant?: 'thinking' | 'waiting' | 'correct' | 'incorrect' | 'default'
+    variant?: 'thinking' | 'waiting' | 'correct' | 'incorrect' | 'timeout' | 'default'
     direction?: 'left' | 'right'
     className?: string
 }
@@ -22,6 +22,8 @@ export function StatusBubble({
                 return 'bg-[#22c55e] text-white'
             case 'incorrect':
                 return 'bg-[#ef4444] text-white'
+            case 'timeout':
+                return 'bg-[#f59e0b] text-white' // Amber-500 for timeout warning
             case 'waiting':
                 return 'bg-[#e2e8f0] text-[#64748b]'
             case 'thinking':
