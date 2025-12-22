@@ -48,6 +48,7 @@ function BattleContent() {
     currentQuestion,
     onAnswer: handleBotAnswer,
     isEnabled: true,
+    matchId: state.session?.matchId,
   })
 
   // --- TRANSITION LOGIC (Inlined) ---

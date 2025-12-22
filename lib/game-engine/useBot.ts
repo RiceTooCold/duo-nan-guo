@@ -2,18 +2,29 @@
 
 import { useEffect, useRef } from 'react';
 import { GamePhase, type ClientQuestion } from '@/types/game';
+import { getBotAnswer } from '@/actions/bot.server';
 
 interface UseBotProps {
     phase: GamePhase;
     currentQuestion: ClientQuestion | undefined;
     onAnswer: (answer: string) => void;
     isEnabled?: boolean;
+    matchId?: string;
+    botDifficulty?: 'easy' | 'medium' | 'hard';
 }
 
 /**
- * Hook to simulate Bot behavior during the game.
+ * Hook to manage LLM Bot behavior during the game.
+ * Calls server action to get Gemini's answer for each question.
  */
-export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: UseBotProps) {
+export function useBot({
+    phase,
+    currentQuestion,
+    onAnswer,
+    isEnabled = true,
+    matchId,
+    botDifficulty = 'medium',
+}: UseBotProps) {
     // Keep a ref to the latest callback to avoid restarting the effect
     const onAnswerRef = useRef(onAnswer);
     useEffect(() => {
@@ -22,46 +33,65 @@ export function useBot({ phase, currentQuestion, onAnswer, isEnabled = true }: U
 
     // Track whether bot has answered current question
     const hasAnsweredRef = useRef(false);
+    // Track if we're currently fetching
+    const isFetchingRef = useRef(false);
 
     useEffect(() => {
         // Reset when moving to a new question (READY resets for new question)
         if (phase === GamePhase.READY || phase === GamePhase.IDLE) {
             hasAnsweredRef.current = false;
+            isFetchingRef.current = false;
             return;
         }
 
         // Bot can start thinking during PLAYING or RESOLVING
-        // This prevents the bot from missing its chance to answer if the player
-        // answers quickly and phase transitions to RESOLVING
         if (phase !== GamePhase.PLAYING && phase !== GamePhase.RESOLVING) {
             return;
         }
-        if (!isEnabled || !currentQuestion || hasAnsweredRef.current) {
+        if (!isEnabled || !currentQuestion || hasAnsweredRef.current || isFetchingRef.current) {
             return;
         }
 
-        // Simulate thinking time (2-4 seconds)
-        const delay = Math.floor(Math.random() * 2000) + 2000;
+        // Start fetching LLM answer
+        isFetchingRef.current = true;
 
-        const timeout = setTimeout(() => {
-            // Check current status one last time
-            if (hasAnsweredRef.current) return;
+        const fetchBotAnswer = async () => {
+            try {
+                // Call LLM Bot server action
+                const { answer, thinkingMs } = await getBotAnswer(
+                    matchId || 'unknown',
+                    currentQuestion.id,
+                    botDifficulty
+                );
 
-            // Note: We don't check phase here rigidly because if the phase moved to RESOLVING
-            // (e.g. user answered 0.1s ago), the bot should still likely submit its answer
-            // to show "simultaneous" play, or we can enforce proper phase checks.
-            // For now, let's allow it to answer if it was thinking.
+                // Check if still valid to answer
+                if (hasAnsweredRef.current) return;
 
-            const keys = Object.keys(currentQuestion.options);
-            if (keys.length === 0) return;
+                // Wait for remaining "thinking" time for natural feel
+                // (Some time already passed during API call)
+                const minDelay = Math.max(500, thinkingMs - 1000);
 
-            // Randomly pick an option
-            const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                setTimeout(() => {
+                    if (hasAnsweredRef.current) return;
+                    hasAnsweredRef.current = true;
+                    onAnswerRef.current(answer);
+                }, minDelay);
 
-            hasAnsweredRef.current = true;
-            onAnswerRef.current(randomKey);
-        }, delay);
+            } catch (error) {
+                console.error('Bot answer fetch failed:', error);
+                // Fallback to random answer
+                if (!hasAnsweredRef.current) {
+                    const keys = Object.keys(currentQuestion.options);
+                    const randomKey = keys[Math.floor(Math.random() * keys.length)];
+                    hasAnsweredRef.current = true;
+                    onAnswerRef.current(randomKey);
+                }
+            } finally {
+                isFetchingRef.current = false;
+            }
+        };
 
-        return () => clearTimeout(timeout);
-    }, [phase, currentQuestion, isEnabled]); // Removed onAnswer to prevent timer reset on tick
+        fetchBotAnswer();
+
+    }, [phase, currentQuestion, isEnabled, matchId, botDifficulty]);
 }
