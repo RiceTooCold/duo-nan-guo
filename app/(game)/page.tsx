@@ -71,7 +71,7 @@ export default function HomePage() {
         transition={{ duration: 0.6 }}
       >
         <h1 className="text-5xl font-black text-(--game-fg) tracking-tight mb-2 drop-shadow-sm">
-          Dun<span className="text-(--game-accent)">Nan</span>Guo
+          Duo<span className="text-(--game-accent)">Nan</span>Guo
         </h1>
         <p className="text-lg text-(--game-muted-fg) font-bold tracking-wide">
           多難過 · 語言學習對戰
@@ -223,8 +223,8 @@ export default function HomePage() {
                   onKeyDown={(e) => e.key === 'Enter' && handleAdminAccess()}
                   placeholder="輸入管理員密碼"
                   className={`w-full px-4 py-3 rounded-xl bg-(--game-muted) border-2 text-(--game-fg) font-bold focus:outline-none transition-colors ${passwordError
-                      ? 'border-(--game-error) bg-red-50 focus:border-(--game-error)'
-                      : 'border-transparent focus:border-(--game-accent) focus:bg-white'
+                    ? 'border-(--game-error) bg-red-50 focus:border-(--game-error)'
+                    : 'border-transparent focus:border-(--game-accent) focus:bg-white'
                     }`}
                   autoFocus
                 />

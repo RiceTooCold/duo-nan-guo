@@ -1,6 +1,6 @@
 {
   "name": "duo-nan-guo",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -12,6 +12,7 @@
     "db:studio": "prisma studio",
     "seed-bots": "npx tsx prisma/seed-bots.ts"
   },
+  "postinstall": "prisma generate",
   "dependencies": {
     "@ai-sdk/google": "^3.0.0",
     "@ai-sdk/openai": "^3.0.0",
