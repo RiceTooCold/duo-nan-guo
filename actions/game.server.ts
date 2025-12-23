@@ -691,6 +691,52 @@ export async function startWaitingMatch(matchId: string): Promise<void> {
 }
 
 /**
+ * Host initiates the game start countdown
+ * Validates that the caller is the host and there are 2 players
+ */
+export async function hostStartGame(
+    matchId: string,
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        const match = await prisma.match.findUnique({
+            where: { id: matchId },
+        });
+
+        if (!match) {
+            return { success: false, error: 'Match not found' };
+        }
+
+        if (match.status !== MatchStatus.waiting) {
+            return { success: false, error: 'Match is not in waiting state' };
+        }
+
+        // Validate caller is the host (player_1)
+        const host = match.players.find((p: MatchPlayer) => p.playerId === 'player_1');
+        if (!host || host.userId !== userId) {
+            return { success: false, error: 'Only the host can start the game' };
+        }
+
+        // Validate there are 2 players
+        if (match.players.length < 2) {
+            return { success: false, error: 'Need 2 players to start' };
+        }
+
+        // Broadcast START_COUNTDOWN to all players in the room
+        await pusherServer.trigger(
+            getRoomChannel(matchId),
+            ROOM_EVENTS.START_COUNTDOWN,
+            { matchId }
+        );
+
+        return { success: true };
+    } catch (error) {
+        console.error('hostStartGame error:', error);
+        return { success: false, error: 'Failed to start game' };
+    }
+}
+
+/**
  * Get basic match info for waiting room
  */
 export async function getMatchInfo(matchId: string): Promise<{
@@ -754,6 +800,13 @@ export async function leaveWaitingMatch(
             where: { id: matchId },
             data: { players: updatedPlayers },
         });
+
+        // Notify host that guest left
+        await pusherServer.trigger(
+            getRoomChannel(matchId),
+            ROOM_EVENTS.GUEST_LEFT,
+            {}
+        );
     }
 }
 

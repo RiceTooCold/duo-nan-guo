@@ -9,6 +9,8 @@ import { ArrowLeft, Users, Bot, Check } from 'lucide-react'
 import { createWaitingMatch, getBotUsers, type BotUserInfo } from '@/actions/game.server'
 import { gameLanguages, questionCounts, levelToRank, type GameLanguageConfig } from '@/lib/config/game'
 import type { TargetLanguage } from '@/generated/prisma'
+import { Avatar } from '@/components/game/Avatar'
+import { getGameLanguage } from '@/lib/config/game'
 
 export default function PlayPage() {
     const router = useRouter()
@@ -97,8 +99,8 @@ export default function PlayPage() {
                                 whileTap={{ scale: 0.98 }}
                             >
                                 <span className="text-3xl mb-2 block">{lang.flag}</span>
-                                <span className="font-semibold text-[#333]">{lang.name}</span>
-                                <span className="text-xs text-[#64748b] block">{lang.examName}</span>
+                                <span className="font-semibold text-[#333]">{lang.examName}</span>
+                                <span className="text-xs text-[#64748b] block">{lang.name}</span>
                             </motion.button>
                         ))}
                     </div>
@@ -167,8 +169,8 @@ export default function PlayPage() {
                             whileTap={{ scale: 0.98 }}
                         >
                             <Bot className="w-8 h-8 text-[#3b82f6]" />
-                            <span className="font-semibold text-[#333]">LLM Bot</span>
-                            <span className="text-xs text-[#64748b]">單人練習</span>
+                            <span className="font-semibold text-[#333]">PvE 對戰</span>
+                            <span className="text-xs text-[#64748b]">大型語言模型</span>
                         </motion.button>
                         <motion.button
                             onClick={() => setOpponent('player')}
@@ -179,8 +181,8 @@ export default function PlayPage() {
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                         >
-                            <Users className="w-8 h-8 text-[#22c55e]" />
-                            <span className="font-semibold text-[#333]">真人對戰</span>
+                            <Users className="w-8 h-8 text-[#3b82f6]" />
+                            <span className="font-semibold text-[#333]">PvP 對戰</span>
                             <span className="text-xs text-[#64748b]">配對玩家</span>
                         </motion.button>
                     </div>
@@ -192,7 +194,7 @@ export default function PlayPage() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                     >
-                        <h2 className="text-sm font-semibold text-[#64748b] mb-3">選擇 Bot</h2>
+                        <h2 className="text-sm font-semibold text-[#64748b] mb-3">選擇 LLM</h2>
                         <div className="grid grid-cols-3 gap-2">
                             {botUsers.map((bot) => (
                                 <motion.button
@@ -210,12 +212,17 @@ export default function PlayPage() {
                                             <Check className="w-3 h-3 text-white" />
                                         </div>
                                     )}
-                                    <span className="text-xl">🤖</span>
+                                    <Avatar
+                                        className="w-12 h-12"
+                                        src={bot.image}
+                                        fallback="🤖"
+                                        alt={bot.name}
+                                    />
                                     <span className="font-semibold text-[#333] text-xs truncate w-full text-center">
                                         {bot.name.replace(' Bot', '')}
                                     </span>
                                     <span className="text-[10px] text-[#64748b] truncate w-full text-center">
-                                        {bot.botModel?.split('-')[0] || 'LLM'}
+                                        {bot.botModel || 'LLM'}
                                     </span>
                                 </motion.button>
                             ))}
@@ -232,13 +239,17 @@ export default function PlayPage() {
                     >
                         <h3 className="text-sm font-semibold text-[#64748b] mb-2">房間設定</h3>
                         <div className="flex items-center gap-4 text-[#333]">
-                            <span className="text-2xl">{selectedLanguage.flag}</span>
-                            <div>
+                            <div className="flex items-center gap-2 justify-center w-full">
                                 <p className="font-bold">
-                                    {selectedLanguage.name} {selectedLevel}
+                                    {selectedLanguage.examName} {selectedLevel}
                                 </p>
+                                <span className="text-[#64748b]">－</span>
                                 <p className="text-sm text-[#64748b]">
-                                    {selectedCount}題 · {opponent === 'bot' ? 'AI 對戰' : '真人對戰'}
+                                    {selectedCount}題
+                                </p>
+                                <span className="text-[#64748b]">－</span>
+                                <p className="text-sm text-[#64748b]">
+                                    {opponent === 'bot' ? 'PvE 對戰' : 'PvP 對戰'} [{opponent === 'bot' && botUsers.find((bot) => bot.id === selectedBotId)?.name.replace(' Bot', '')}]
                                 </p>
                             </div>
                         </div>
@@ -247,7 +258,7 @@ export default function PlayPage() {
             </div>
 
             {/* Fixed Bottom Button */}
-            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] p-4 bg-gradient-to-t from-[#F5F8FC] via-[#F5F8FC]/95 to-transparent">
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] p-4 bg-linear-gradient-to-t from-[#F5F8FC] via-[#F5F8FC]/95 to-transparent">
                 <motion.button
                     onClick={handleCreateRoom}
                     disabled={!isReady || isCreating}

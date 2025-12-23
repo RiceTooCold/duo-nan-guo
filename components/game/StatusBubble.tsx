@@ -27,7 +27,7 @@ export function StatusBubble({
             case 'waiting':
                 return 'bg-[#e2e8f0] text-[#64748b]'
             case 'thinking':
-                return 'bg-[#f1f5f9] text-[#64748b] border-[#cbd5e1] border'
+                return 'bg-[#f1f5f9] text-[#64748b]'
             default:
                 return 'bg-white text-[#333]'
         }

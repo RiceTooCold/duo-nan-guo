@@ -186,7 +186,7 @@ export default function JoinPage() {
             </div>
 
             {/* Fixed Bottom - Create Room CTA */}
-            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] p-4 bg-gradient-to-t from-[#F5F8FC] via-[#F5F8FC]/95 to-transparent">
+            <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[480px] p-4 bg-linear-gradient-t from-[#F5F8FC] via-[#F5F8FC]/95 to-transparent">
                 <Link href="/play">
                     <motion.button
                         className="w-full py-4 text-lg font-semibold rounded-2xl bg-white border-2 border-[#D5E3F7] text-[#5B8BD4] hover:bg-[#D5E3F7] transition-all"

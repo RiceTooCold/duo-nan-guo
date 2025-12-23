@@ -33,20 +33,20 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
     }
 
     return (
-        <div className="min-h-dvh flex flex-col bg-[#F5F8FC] relative overflow-hidden">
-            {/* Decorative BG */}
-            <div className="absolute top-0 left-0 w-full h-[400px] bg-linear-to-b from-[#D5E3F7]/50 to-transparent -z-10" />
+        <div className="min-h-dvh flex flex-col bg-(--game-muted) relative overflow-hidden font-sans">
+            {/* Decorative BG - Consistent with Results Page */}
+            <div className="absolute top-0 left-0 w-full h-[400px] bg-linear-to-b from-(--game-secondary)/30 to-transparent -z-10" />
             <motion.div
-                className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-[#A9C4EB]/20 rounded-full blur-3xl"
+                className="absolute top-[-50px] right-[-50px] w-64 h-64 bg-(--game-primary)/10 rounded-full blur-3xl -z-10"
                 animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
                 transition={{ duration: 5, repeat: Infinity }}
             />
 
             {/* Header / Player Command Center */}
-            <header className="px-6 pt-8 pb-2">
-                <div className="relative overflow-hidden rounded-3xl bg-[#F5F8FC] backdrop-blur-xl border border-white/40 p-5 shadow-xl shadow-[#5B8BD4]/5">
-                    <div className="flex items-center gap-4">
-                        {/* Avatar (MD) */}
+            <header className="px-6 pt-8 pb-4">
+                <div className="relative overflow-visible">
+                    <div className="flex items-center gap-5 bg-white/60 backdrop-blur-md border border-white/60 p-4 rounded-3xl shadow-sm">
+                        {/* Avatar */}
                         <motion.div
                             initial={{ scale: 0.8, opacity: 0 }}
                             animate={{ scale: 1, opacity: 1 }}
@@ -58,36 +58,35 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                                 fallback={session?.user?.name?.substring(0, 1).toUpperCase() || 'U'}
                                 size="md"
                             />
-                            {/* Simple border ring if needed, or keeping it clean as user removed pulse */}
                         </motion.div>
 
                         {/* User Info & Stats */}
-                        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1">
+                        <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                             <motion.div
                                 initial={{ opacity: 0, x: -10 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 transition={{ delay: 0.1 }}
                             >
                                 {/* Top Row: Name & Level */}
-                                <div className="flex items-center gap-2 mb-0.5">
-                                    <h2 className="text-xl font-black text-[#333] tracking-tight truncate max-w-[140px]">
+                                <div className="flex items-center gap-2 mb-1">
+                                    <h2 className="text-lg font-black text-(--game-fg) tracking-tight truncate">
                                         {session?.user?.name || 'Player'}
                                     </h2>
-                                    <span className="bg-[#5B8BD4] text-white text-[10px] font-bold px-1.5 py-0.5 rounded-md shrink-0">
+                                    <span className="bg-blue-50 text-(--game-accent) text-[10px] font-bold px-2 py-0.5 rounded-full border border-blue-100 shrink-0">
                                         Lv.{stats.level}
                                     </span>
                                 </div>
 
-                                {/* Rank Title */}
-                                <div className="flex items-center justify-between text-xs font-bold text-[#64748b] mb-2">
+                                {/* Rank Title & XP */}
+                                <div className="flex items-center justify-between text-xs font-bold text-(--game-muted-fg) mb-2">
                                     <span>{rankTitle}</span>
-                                    <span className="text-[10px] text-[#94a3b8] tracking-wider uppercase">XP {Math.round(xpProgress)}%</span>
+                                    <span className="text-[10px] text-(--game-muted-fg) tracking-wider font-medium opacity-80">EXP {Math.round(xpProgress)}%</span>
                                 </div>
 
                                 {/* XP Progress Bar */}
-                                <div className="h-1.5 w-full bg-[#E2E8F0] rounded-full overflow-hidden">
+                                <div className="h-1.5 w-full bg-[#f1f5f9] rounded-full overflow-hidden">
                                     <motion.div
-                                        className="h-full bg-linear-to-r from-[#5B8BD4] to-[#4A7BC4]"
+                                        className="h-full bg-(--game-accent)"
                                         initial={{ width: 0 }}
                                         animate={{ width: `${xpProgress}%` }}
                                         transition={{ duration: 1, delay: 0.5 }}
@@ -96,49 +95,49 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                             </motion.div>
                         </div>
 
-                        {/* Actions (Settings & Logout) */}
-                        <div className="shrink-0 self-start -mt-1 -mr-1 flex flex-col items-center gap-1">
-
+                        {/* Settings / Logout */}
+                        <div className="shrink-0 self-start">
                             <motion.button
                                 onClick={handleSignOut}
-                                className="p-2 bg-white/50 hover:bg-white hover:text-red-500 rounded-full transition-colors"
-                                whileHover={{ scale: 1.1 }}
-                                whileTap={{ scale: 0.9 }}
+                                className="p-2 text-(--game-muted-fg) hover:text-slate-600 hover:bg-[#f1f5f9] rounded-xl transition-colors"
                             >
-                                <LogOut className="w-4 h-4 text-[#64748b] hover:text-red-500" />
+                                <LogOut className="w-5 h-5" />
                             </motion.button>
                         </div>
                     </div>
                 </div>
             </header>
 
-            {/* Stats Overview */}
+            {/* Stats Overview - Clean Single Color */}
             <section className="px-6 mb-6">
                 <div className="grid grid-cols-2 gap-3">
-                    <StatCard
-                        icon={<Gamepad className="w-full h-full text-[#F59E0B]" />}
+                    <StatBox
+                        icon={Gamepad}
                         label="總場次"
-                        value={stats.totalMatches.toString()}
+                        value={stats.totalMatches}
                         delay={0.1}
+                        highlight={stats.totalMatches > 10}
                     />
-                    <StatCard
-                        icon={<Crosshair className="w-full h-full text-[#10B981]" />}
+                    <StatBox
+                        icon={Crosshair}
                         label="勝率"
                         value={`${stats.winRate}%`}
                         delay={0.2}
+                        highlight={stats.winRate > 50}
                     />
-                    <StatCard
-                        icon={<Flame className="w-full h-full text-[#EF4444]" />}
+                    <StatBox
+                        icon={Flame}
                         label="連勝"
-                        value={stats.currentStreak.toString()}
+                        value={stats.currentStreak}
                         delay={0.3}
                         highlight={stats.currentStreak > 2}
                     />
-                    <StatCard
-                        icon={<Zap className="w-full h-full text-[#8B5CF6]" />}
-                        label="反應速度"
+                    <StatBox
+                        icon={Zap}
+                        label="速度"
                         value={`${stats.avgSpeed}s`}
                         delay={0.4}
+                        highlight={stats.avgSpeed < 2}
                     />
                 </div>
             </section>
@@ -149,45 +148,46 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                 {/* Hero / Game Actions */}
                 <motion.section
                     className="relative"
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
+                    initial={{ opacity: 0, scale: 0.98 }}
+                    animate={{ opacity: 1, scale: 1 }}
                     transition={{ delay: 0.3 }}
                 >
-                    <div className="relative overflow-visible bg-linear-to-br from-[#5B8BD4] to-[#4A7BC4] rounded-3xl p-6 shadow-xl shadow-[#5B8BD4]/30 text-white min-h-[160px] flex flex-col justify-center">
+                    <div className="relative overflow-visible bg-(--game-accent) rounded-4xl p-6 shadow-xl shadow-blue-500/20 min-h-[160px] flex flex-col justify-center group hover:shadow-blue-500/30 transition-shadow">
+
+                        {/* Subtle Texture/Gradient Overlay */}
+                        <div className="absolute inset-0 bg-linear-to-br from-white/10 to-transparent rounded-4xl pointer-events-none" />
 
                         {/* Mascot Image */}
-                        <div className="absolute -right-4 -bottom-6 w-50 h-50 pointer-events-none">
+                        <div className="absolute -right-4 -bottom-6 w-48 h-48 pointer-events-none group-hover:scale-105 transition-transform duration-500">
                             <Image
                                 src="/mascot-parrot.png"
                                 alt="Coach Parrot"
                                 width={200}
                                 height={200}
-                                className="object-contain drop-shadow-xl transform rotate-[-5deg]"
+                                className="object-contain drop-shadow-2xl transform rotate-[-5deg]"
                             />
                         </div>
 
-                        <div className="relative z-10 w-[65%]">
-                            <h3 className="text-2xl font-bold mb-1">戰鬥時刻！</h3>
-                            <p className="text-blue-100 text-sm mb-4 font-medium leading-relaxed">
-                                創建或加入房間，挑戰對手！
+                        <div className="relative z-10 w-[65%] text-white">
+                            <h3 className="text-2xl font-black mb-1 tracking-tight drop-shadow-md">準備好了嗎？</h3>
+                            <p className="text-blue-50 text-sm mb-5 font-medium leading-relaxed opacity-90">
+                                立即開始對戰，提升你的語言等級！
                             </p>
 
-                            <div className="flex gap-2">
-                                <Link href="/play">
+                            <div className="flex flex-col gap-2.5 items-start">
+                                <Link href="/play" className="w-full sm:w-auto">
                                     <motion.button
-                                        className="px-4 py-2.5 bg-white text-[#5B8BD4] font-bold rounded-xl shadow-lg flex items-center gap-1.5 text-sm"
-                                        whileHover={{ scale: 1.05 }}
-                                        whileTap={{ scale: 0.95 }}
+                                        className="w-auto px-6 py-3 bg-white text-(--game-accent) font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 text-sm transition-all hover:bg-blue-50"
+                                        whileTap={{ scale: 0.97 }}
                                     >
                                         <Sword className="w-4 h-4 fill-current" />
                                         <span>創建房間</span>
                                     </motion.button>
                                 </Link>
-                                <Link href="/join">
+                                <Link href="/join" className="w-full sm:w-auto">
                                     <motion.button
-                                        className="px-4 py-2.5 bg-white/20 text-white font-bold rounded-xl shadow-lg flex items-center gap-1.5 text-sm border border-white/30"
-                                        whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.3)' }}
-                                        whileTap={{ scale: 0.95 }}
+                                        className="w-auto px-6 py-3 bg-blue-600/30 text-white font-bold rounded-xl border border-white/20 shadow-sm flex items-center justify-center gap-2 text-sm transition-all hover:bg-blue-600/40"
+                                        whileTap={{ scale: 0.97 }}
                                     >
                                         <User className="w-4 h-4" />
                                         <span>加入房間</span>
@@ -195,35 +195,26 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                                 </Link>
                             </div>
                         </div>
-
-                        {/* Background Decor */}
-                        <motion.div
-                            className="absolute top-[-20%] left-[20%] w-20 h-20 bg-white/10 rounded-full blur-xl"
-                            animate={{ scale: [1, 1.5, 1], opacity: [0.1, 0.3, 0.1] }}
-                            transition={{ duration: 4, repeat: Infinity }}
-                        />
                     </div>
                 </motion.section>
 
-                {/* Navigation Grid */}
+                {/* Secondary Actions */}
                 <section className="grid grid-cols-2 gap-4">
                     <Link href="/history">
                         <ActionCard
-                            icon={<History className="w-5 h-5 text-[#8B5CF6]" />}
+                            icon={History}
                             title="歷史戰績"
                             desc="查看紀錄"
-                            color="bg-[#F3E8FF]"
                             delay={0.4}
                         />
                     </Link>
 
                     <Link href="/leaderboard">
                         <ActionCard
-                            icon={<ChartNoAxesCombined className="w-5 h-5 text-[#F59E0B]" />}
+                            icon={ChartNoAxesCombined}
                             title="排行榜"
-                            desc="即將推出"
-                            color="bg-[#FEF3C7]"
-                            delay={0.6}
+                            desc="最強王者"
+                            delay={0.5}
                         />
                     </Link>
                 </section>
@@ -234,37 +225,36 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
 
 // Sub-components
 
-function StatCard({ icon, label, value, delay, highlight = false }: { icon: React.ReactNode, label: string, value: string, delay: number, highlight?: boolean }) {
+function StatBox({ icon: Icon, label, value, delay, highlight = false }: { icon: React.ElementType, label: string, value: number | string, delay: number, highlight?: boolean }) {
     return (
         <motion.div
-            className={`bg-white p-3 rounded-2xl shadow-sm border ${highlight ? 'border-[#EF4444]/30 bg-[#FEF2F2]' : 'border-[#e2e8f0]'} flex flex-col items-center justify-center text-center gap-1`}
+            className={`flex flex-col items-center justify-center py-4 rounded-2xl bg-white border border-[#e2e8f0] shadow-sm transition-all`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay }}
         >
-            <div className="w-6 h-6">{icon}</div>
-            <p className="text-2xl font-black text-[#333] leading-none">{value}</p>
-            <p className="text-xs uppercase tracking-wider font-bold text-[#94a3b8]">{label}</p>
+            <Icon className="w-4 h-4 mb-2" />
+            <p className={`text-2xl font-black ${highlight ? 'text-(--game-accent)' : 'text-(--game-fg)'} leading-none mb-1`}>{value}</p>
+            <p className="text-sm font-bold text-(--game-muted-fg)">{label}</p>
         </motion.div>
     )
 }
 
-function ActionCard({ icon, title, desc, color, delay }: { icon: React.ReactNode, title: string, desc: string, color: string, delay: number }) {
+function ActionCard({ icon: Icon, title, desc, delay }: { icon: React.ElementType, title: string, desc: string, delay: number }) {
     return (
         <motion.div
-            className="bg-white p-4 rounded-2xl shadow-sm border border-[#e2e8f0] h-full flex flex-col items-start gap-3 hover:border-[#5B8BD4]/50 transition-colors cursor-pointer group"
-            initial={{ opacity: 0, scale: 0.9 }}
+            className="bg-white p-5 rounded-2xl shadow-sm border border-[#e2e8f0] h-full flex flex-col items-center justify-center gap-3 hover:border-(--game-primary) hover:shadow-md transition-all cursor-pointer group"
+            initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay }}
-            whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
         >
-            <div className={`p-2.5 rounded-xl ${color} group-hover:scale-110 transition-transform`}>
-                {icon}
+            <div className="p-2.5 rounded-xl bg-(--game-muted) text-(--game-muted-fg) group-hover:bg-[#EFF6FF] group-hover:text-(--game-accent) transition-colors">
+                <Icon className="w-5 h-5" />
             </div>
-            <div>
-                <h4 className="font-bold text-[#333] text-sm">{title}</h4>
-                <p className="text-xs text-[#64748b]">{desc}</p>
+            <div className="text-center">
+                <h4 className="font-bold text-(--game-fg) text-lg mb-0.5 group-hover:text-(--game-accent) transition-colors">{title}</h4>
+                <p className="text-xs text-(--game-muted-fg) font-medium">{desc}</p>
             </div>
         </motion.div>
     )

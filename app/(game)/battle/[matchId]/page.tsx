@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useParams, useRouter } from 'next/navigation'
 import { Avatar } from '@/components/game/Avatar'
 import { StatusBubble } from '@/components/game/StatusBubble'
-import { ScoreBubble } from '@/components/game/ScoreBubble'
 import { BatteryScore } from '@/components/game/BatteryScore'
 import { OptionCard } from '@/components/game/OptionCard'
 import { BattleIntro } from '@/components/game/BattleIntro'
@@ -283,6 +282,7 @@ function BattleContent() {
 
                     <div className="flex flex-col items-start gap-1">
                         <BatteryScore score={selfState?.score || 0} variant="default" />
+
                     </div>
                 </motion.div>
 

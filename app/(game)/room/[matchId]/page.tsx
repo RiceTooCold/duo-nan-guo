@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -12,7 +12,8 @@ import {
     getMatchInfo,
     triggerBotJoin,
     startWaitingMatch,
-    leaveWaitingMatch
+    leaveWaitingMatch,
+    hostStartGame
 } from '@/actions/game.server'
 import { getPusherClient, getRoomChannel, ROOM_EVENTS } from '@/lib/pusher'
 import { rankToLevel } from '@/lib/config/game'
@@ -38,7 +39,7 @@ interface MatchInfo {
     isBot: boolean
 }
 
-const languageNames: Record<TargetLanguage, string> = {
+const languageTestNames: Record<TargetLanguage, string> = {
     JP: '日文',
     EN: '英文',
     KR: '韓文',
@@ -52,10 +53,11 @@ export default function WaitingRoomPage() {
     const { data: session } = useSession()
 
     const [match, setMatch] = useState<MatchInfo | null>(null)
-    const [status, setStatus] = useState<'loading' | 'waiting' | 'starting' | 'error'>('loading')
+    const [status, setStatus] = useState<'loading' | 'waiting' | 'starting' | 'leaving' | 'error'>('loading')
     const [countdown, setCountdown] = useState(3)
     const [showCountdown, setShowCountdown] = useState(false)
     const [error, setError] = useState<string | null>(null)
+    const isLeavingRef = useRef(false)
 
     const isHost = match?.players[0]?.userId === session?.user?.id
     const hasGuest = (match?.players?.length ?? 0) >= 2
@@ -108,10 +110,8 @@ export default function WaitingRoomPage() {
                 setMatch(data as MatchInfo)
                 setStatus('waiting')
 
-                // If both players already present, start countdown
-                if (data.players.length >= 2) {
-                    startCountdown()
-                }
+                // Note: We don't auto-start countdown anymore
+                // The host must manually start the game
             } catch (err) {
                 console.error('Failed to load match:', err)
                 setError('無法載入房間')
@@ -140,17 +140,35 @@ export default function WaitingRoomPage() {
                     players: [...prev.players, data.player],
                 }
             })
-            // When guest joins, start countdown
+            // Don't auto-start countdown - wait for host to click start
+        })
+
+        // Listen for host starting the countdown
+        channel.bind(ROOM_EVENTS.START_COUNTDOWN, () => {
             startCountdown()
         })
 
         channel.bind(ROOM_EVENTS.HOST_LEFT, () => {
+            // Ignore if we're the one leaving
+            if (isLeavingRef.current) return
             setError('房主已離開，房間關閉')
             setStatus('error')
         })
 
         channel.bind(ROOM_EVENTS.GAME_STARTED, () => {
             router.push(`/battle/${matchId}`)
+        })
+
+        // Listen for guest leaving
+        channel.bind(ROOM_EVENTS.GUEST_LEFT, () => {
+            setMatch(prev => {
+                if (!prev) return prev
+                // Remove player_2 from the players list
+                return {
+                    ...prev,
+                    players: prev.players.filter(p => p.playerId === 'player_1'),
+                }
+            })
         })
 
         return () => {
@@ -170,10 +188,21 @@ export default function WaitingRoomPage() {
 
     // Handle leaving room
     const handleLeave = async () => {
+        isLeavingRef.current = true
+        setStatus('leaving') // Prevent showing error from own HOST_LEFT event
         if (session?.user?.id) {
             await leaveWaitingMatch(matchId, session.user.id)
         }
         router.push('/lobby')
+    }
+
+    // Handle host starting the game
+    const handleStartGame = async () => {
+        if (!session?.user?.id) return
+        const result = await hostStartGame(matchId, session.user.id)
+        if (!result.success) {
+            console.error('Failed to start game:', result.error)
+        }
     }
 
     // Error state
@@ -215,7 +244,7 @@ export default function WaitingRoomPage() {
                 <div className="flex flex-col">
                     <h1 className="text-xl font-black text-[#333]">等待對戰</h1>
                     <p className="text-xs text-[#64748b] font-bold uppercase tracking-widest mt-1">
-                        {languageNames[match.targetLanguage]} · {rankToLevel(match.targetLanguage, match.rank)} · {match.questionCount}題
+                        {languageTestNames[match.targetLanguage]} · {rankToLevel(match.targetLanguage, match.rank)} · {match.questionCount}題
                     </p>
                 </div>
                 <div className="px-4 py-1.5 bg-[#D5E3F7] rounded-full text-sm font-black text-[#5B8BD4] shadow-sm">
@@ -351,6 +380,45 @@ export default function WaitingRoomPage() {
                             <p className="text-[#5B8BD4] font-black text-xl italic animate-pulse">
                                 戰鬥即將開始...
                             </p>
+                        </motion.div>
+                    ) : isHost && hasGuest ? (
+                        <motion.div
+                            key="host-ready"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex gap-3"
+                        >
+                            <button
+                                onClick={handleLeave}
+                                className="w-full px-4 py-2 text-sm font-semibold rounded-xl text-[#64748b] hover:bg-[#D5E3F7] transition-all border-2 border-[#D5E3F7]"
+                            >
+                                取消
+                            </button>
+                            <button
+                                onClick={handleStartGame}
+                                className="w-full px-6 py-4 text-lg font-black rounded-2xl bg-[#5B8BD4] text-white hover:bg-[#4A7BC4] transition-all shadow-lg"
+                            >
+                                開始遊戲
+                            </button>
+                        </motion.div>
+                    ) : !isHost && hasGuest ? (
+                        <motion.div
+                            key="guest-waiting"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            className="flex flex-col gap-3"
+                        >
+                            <div className="text-center py-4">
+                                <p className="text-[#64748b] font-semibold animate-pulse">
+                                    等待房主開始遊戲...
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleLeave}
+                                className="w-full px-4 py-2 text-sm font-semibold rounded-xl text-[#64748b] hover:bg-[#D5E3F7] transition-all"
+                            >
+                                離開房間
+                            </button>
                         </motion.div>
                     ) : (
                         <motion.div

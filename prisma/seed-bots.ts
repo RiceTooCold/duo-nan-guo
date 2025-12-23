@@ -9,11 +9,12 @@ const prisma = new PrismaClient();
 
 const BOT_USERS = [
     {
-        name: 'Gemma Bot',
+        name: 'Gemma',
         email: 'bot-gemma@duo-nan-guo.local',
         isBot: true,
         botModel: 'gemma-3-27b-it',
         role: UserRole.user,
+        image: '/gemma.png',
         stats: {
             totalMatches: 0,
             wins: 0,
@@ -24,11 +25,12 @@ const BOT_USERS = [
         },
     },
     {
-        name: 'Llama Bot',
+        name: 'Llama',
         email: 'bot-llama@duo-nan-guo.local',
         isBot: true,
         botModel: 'llama-3.3-70b-versatile',
         role: UserRole.user,
+        image: '/llama.png',
         stats: {
             totalMatches: 0,
             wins: 0,
@@ -39,11 +41,12 @@ const BOT_USERS = [
         },
     },
     {
-        name: 'GPT-4o-mini Bot',
+        name: 'GPT-4o-mini',
         email: 'bot-gpt4o-mini@duo-nan-guo.local',
         isBot: true,
         botModel: 'gpt-4o-mini',
         role: UserRole.user,
+        image: '/gpt.png',
         stats: {
             totalMatches: 0,
             wins: 0,

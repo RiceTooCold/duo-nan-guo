@@ -6,22 +6,22 @@
   /* Core Colors - 淺藍色系 */
   --game-bg: #ffffff;
   --game-fg: #333333;
-  
+
   /* Primary - 淺藍色 */
   --game-primary: #A9C4EB;
   --game-primary-hover: #8FB3E3;
   --game-primary-fg: #333333;
-  
+
   /* Secondary - 更淺的藍 */
   --game-secondary: #D5E3F7;
   --game-secondary-hover: #C4D8F3;
   --game-secondary-fg: #333333;
-  
+
   /* Accent - 深藍色按鈕 */
   --game-accent: #5B8BD4;
   --game-accent-hover: #4A7BC4;
   --game-accent-fg: #ffffff;
-  
+
   /* UI Elements */
   --game-muted: #F5F8FC;
   --game-muted-fg: #64748b;
@@ -209,19 +209,25 @@
 
 /* ===== Animations ===== */
 @keyframes game-float {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-12px);
   }
 }
 
 @keyframes game-pulse-soft {
-  0%, 100% {
+
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
+
   50% {
     opacity: 0.8;
     transform: scale(1.02);
@@ -233,9 +239,11 @@
     transform: scale(0);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.1);
   }
+
   100% {
     transform: scale(1);
     opacity: 1;
@@ -247,6 +255,7 @@
     transform: translateY(20px);
     opacity: 0;
   }
+
   to {
     transform: translateY(0);
     opacity: 1;
@@ -258,10 +267,12 @@
     transform: scale(0.5);
     opacity: 0;
   }
+
   50% {
     transform: scale(1.2);
     opacity: 1;
   }
+
   100% {
     transform: scale(1);
     opacity: 0;
@@ -289,26 +300,77 @@
 }
 
 /* ===== Utility Classes ===== */
-.game-text-primary { color: var(--game-primary); }
-.game-text-accent { color: var(--game-accent); }
-.game-text-muted { color: var(--game-muted-fg); }
-.game-text-success { color: var(--game-success); }
-.game-text-error { color: var(--game-error); }
-.game-text-warning { color: var(--game-warning); }
-.game-text-info { color: var(--game-info); }
+.game-text-primary {
+  color: var(--game-primary);
+}
 
-.game-bg-primary { background: var(--game-primary); }
-.game-bg-secondary { background: var(--game-secondary); }
-.game-bg-accent { background: var(--game-accent); }
-.game-bg-muted { background: var(--game-muted); }
-.game-bg-success-light { background: var(--game-success-light); }
-.game-bg-error-light { background: var(--game-error-light); }
-.game-bg-warning-light { background: var(--game-warning-light); }
-.game-bg-info-light { background: var(--game-info-light); }
+.game-text-accent {
+  color: var(--game-accent);
+}
 
-.game-border-primary { border-color: var(--game-primary); }
-.game-border-accent { border-color: var(--game-accent); }
-.game-border-border { border-color: var(--game-border); }
+.game-text-muted {
+  color: var(--game-muted-fg);
+}
+
+.game-text-success {
+  color: var(--game-success);
+}
+
+.game-text-error {
+  color: var(--game-error);
+}
+
+.game-text-warning {
+  color: var(--game-warning);
+}
+
+.game-text-info {
+  color: var(--game-info);
+}
+
+.game-bg-primary {
+  background: var(--game-primary);
+}
+
+.game-bg-secondary {
+  background: var(--game-secondary);
+}
+
+.game-bg-accent {
+  background: var(--game-accent);
+}
+
+.game-bg-muted {
+  background: var(--game-muted);
+}
+
+.game-bg-success-light {
+  background: var(--game-success-light);
+}
+
+.game-bg-error-light {
+  background: var(--game-error-light);
+}
+
+.game-bg-warning-light {
+  background: var(--game-warning-light);
+}
+
+.game-bg-info-light {
+  background: var(--game-info-light);
+}
+
+.game-border-primary {
+  border-color: var(--game-primary);
+}
+
+.game-border-accent {
+  border-color: var(--game-accent);
+}
+
+.game-border-border {
+  border-color: var(--game-border);
+}
 
 /* ===== Scrollbar (Game scoped) ===== */
 .game-app::-webkit-scrollbar {
@@ -329,4 +391,3 @@
 .game-app::-webkit-scrollbar-thumb:hover {
   background: var(--game-primary-hover);
 }
-

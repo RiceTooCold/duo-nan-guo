@@ -41,8 +41,10 @@ export const PUSHER_EVENTS = {
 // Room event types (waiting room)
 export const ROOM_EVENTS = {
     PLAYER_JOINED: 'room:player-joined',
+    START_COUNTDOWN: 'room:start-countdown', // Host initiates countdown
     GAME_STARTING: 'room:game-starting',
     GAME_STARTED: 'room:game-started',
     HOST_LEFT: 'room:host-left',
+    GUEST_LEFT: 'room:guest-left', // Player2 left the room
 } as const;
 

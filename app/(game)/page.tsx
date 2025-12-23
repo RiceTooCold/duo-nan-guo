@@ -5,8 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { Avatar } from '@/components/game/Avatar'
-import { Lock, Gamepad2, Settings, X } from 'lucide-react'
+import { Lock, Gamepad2, Settings, X, Sparkles, Star, Globe } from 'lucide-react'
+import Image from 'next/image'
 
 export default function HomePage() {
   const { data: session } = useSession()
@@ -25,12 +25,20 @@ export default function HomePage() {
     }
   }
 
+  // Language codes for display instead of flags
+  const languages = [
+    { code: 'JP', label: '日文' },
+    { code: 'EN', label: '英文' },
+    { code: 'KR', label: '韓文' },
+    { code: 'CN', label: '中文' }
+  ]
+
   return (
-    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-12 bg-gradient-to-b from-white via-[#D5E3F7]/30 to-[#A9C4EB]/20 relative overflow-hidden">
+    <div className="min-h-dvh flex flex-col items-center justify-center px-6 py-12 bg-linear-to-b from-white via-(--game-secondary)/30 to-(--game-primary)/20 relative overflow-hidden font-sans">
       {/* Background decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <motion.div
-          className="absolute top-20 left-10 w-20 h-20 bg-[#A9C4EB]/20 rounded-full blur-xl"
+          className="absolute top-20 left-10 w-20 h-20 bg-(--game-primary)/20 rounded-full blur-xl"
           animate={{
             scale: [1, 1.2, 1],
             opacity: [0.3, 0.5, 0.3]
@@ -38,7 +46,7 @@ export default function HomePage() {
           transition={{ repeat: Infinity, duration: 4 }}
         />
         <motion.div
-          className="absolute bottom-32 right-8 w-32 h-32 bg-[#D5E3F7]/40 rounded-full blur-2xl"
+          className="absolute bottom-32 right-8 w-32 h-32 bg-(--game-secondary)/40 rounded-full blur-2xl"
           animate={{
             scale: [1, 1.3, 1],
             opacity: [0.4, 0.6, 0.4]
@@ -46,7 +54,7 @@ export default function HomePage() {
           transition={{ repeat: Infinity, duration: 5, delay: 1 }}
         />
         <motion.div
-          className="absolute top-1/3 right-4 w-16 h-16 bg-[#5B8BD4]/10 rounded-full blur-lg"
+          className="absolute top-1/3 right-4 w-16 h-16 bg-(--game-accent)/10 rounded-full blur-lg"
           animate={{
             y: [0, -20, 0],
             opacity: [0.2, 0.4, 0.2]
@@ -62,15 +70,15 @@ export default function HomePage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
       >
-        <h1 className="text-5xl font-black text-[#333] tracking-tight mb-2">
-          Dun<span className="text-[#5B8BD4]">Nan</span>Guo
+        <h1 className="text-5xl font-black text-(--game-fg) tracking-tight mb-2 drop-shadow-sm">
+          Dun<span className="text-(--game-accent)">Nan</span>Guo
         </h1>
-        <p className="text-lg text-[#64748b] font-medium">
+        <p className="text-lg text-(--game-muted-fg) font-bold tracking-wide">
           多難過 · 語言學習對戰
         </p>
       </motion.div>
 
-      {/* Mascot - Parrot with floating animation */}
+      {/* Mascot - with updated decorations */}
       <motion.div
         className="relative w-48 h-48 mb-10 z-10"
         initial={{ opacity: 0, scale: 0.5 }}
@@ -82,56 +90,57 @@ export default function HomePage() {
           animate={{ y: [0, -12, 0] }}
           transition={{ repeat: Infinity, duration: 3, ease: 'easeInOut' }}
         >
-          <img
+          <Image
             src="/mascot-parrot-crying.png"
             alt="DunNanGuo Parrot Mascot"
             width={200}
             height={200}
-            className="w-full h-full object-cover"
+            className="w-full h-full object-cover drop-shadow-xl"
           />
         </motion.div>
 
-        {/* Sparkle effects around mascot */}
+        {/* Lucide Icon Decorations */}
         <motion.div
-          className="absolute -top-2 -right-2 text-2xl"
+          className="absolute -top-2 -right-2 text-(--game-warning)"
           animate={{
             rotate: [0, 20, 0],
             scale: [1, 1.2, 1]
           }}
           transition={{ repeat: Infinity, duration: 2 }}
         >
-          ✨
+          <Sparkles className="w-8 h-8 fill-current text-yellow-400" />
         </motion.div>
+
         <motion.div
-          className="absolute bottom-4 -left-4 text-xl"
+          className="absolute bottom-4 -left-4 text-(--game-accent)"
           animate={{
             rotate: [0, -20, 0],
             scale: [1, 1.3, 1]
           }}
           transition={{ repeat: Infinity, duration: 2.5, delay: 0.5 }}
         >
-          ⭐
+          <Star className="w-6 h-6 fill-current text-blue-400" />
         </motion.div>
       </motion.div>
 
-      {/* Supported Languages */}
+      {/* Supported Languages - Styled Code Bubbles */}
       <motion.div
-        className="flex gap-3 mb-10 z-10"
+        className="flex gap-3 mb-12 z-10"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.4 }}
       >
-        {['🇯🇵', '🇺🇸', '🇰🇷', '🇨🇳'].map((flag, index) => (
-          <motion.span
-            key={flag}
-            className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-2xl"
+        {languages.map((lang, index) => (
+          <motion.div
+            key={lang.code}
+            className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center justify-center group"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 + index * 0.1 }}
-            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileHover={{ scale: 1.1, rotate: 3, borderColor: 'var(--game-accent)' }}
           >
-            {flag}
-          </motion.span>
+            <span className="font-black text-sm text-(--game-fg) group-hover:text-(--game-accent) transition-colors">{lang.code}</span>
+          </motion.div>
         ))}
       </motion.div>
 
@@ -145,12 +154,11 @@ export default function HomePage() {
         {/* Play Game Button */}
         <Link href={session ? "/room" : "/login"}>
           <motion.button
-            className="game-btn game-btn-primary w-full py-4 text-lg shadow-lg flex items-center justify-center gap-2"
-            style={{ boxShadow: '0 10px 25px -5px rgba(91, 139, 212, 0.3)' }}
+            className="w-full py-4 bg-(--game-accent) text-white rounded-2xl font-bold shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 text-lg hover:bg-[#4A7BC4] transition-all active:scale-[0.98]"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <Gamepad2 className="w-5 h-5" />
+            <Gamepad2 className="w-5 h-5 fill-white/20" />
             {session ? '開始遊戲' : '登入 / 開始遊戲'}
           </motion.button>
         </Link>
@@ -158,7 +166,7 @@ export default function HomePage() {
         {/* Admin Button */}
         <motion.button
           onClick={() => setShowAdminModal(true)}
-          className="game-btn game-btn-secondary w-full py-3 text-base flex items-center justify-center gap-2"
+          className="w-full py-3 bg-white text-(--game-muted-fg) font-bold rounded-2xl border border-[#e2e8f0] shadow-sm flex items-center justify-center gap-2 hover:bg-slate-50 hover:text-slate-600 transition-all active:scale-[0.98]"
           whileHover={{ scale: 1.02 }}
           whileTap={{ scale: 0.98 }}
         >
@@ -169,7 +177,7 @@ export default function HomePage() {
 
       {/* Footer text */}
       <motion.p
-        className="mt-8 text-sm text-[#64748b] z-10"
+        className="mt-8 text-xs font-bold text-(--game-muted-fg) z-10 tracking-widest uppercase opacity-60"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.8 }}
@@ -181,29 +189,29 @@ export default function HomePage() {
       <AnimatePresence>
         {showAdminModal && (
           <motion.div
-            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-6"
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 p-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setShowAdminModal(false)}
           >
             <motion.div
-              className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl"
+              className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl ring-1 ring-black/5"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[#333] flex items-center gap-2">
-                  <Lock className="w-5 h-5 text-[#5B8BD4]" />
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-black text-(--game-fg) flex items-center gap-2">
+                  <Lock className="w-5 h-5 text-(--game-accent)" />
                   管理員登入
                 </h2>
                 <button
                   onClick={() => setShowAdminModal(false)}
-                  className="text-[#64748b] hover:text-[#333]"
+                  className="p-2 bg-(--game-muted) rounded-full text-(--game-muted-fg) hover:bg-slate-200 transition-colors"
                 >
-                  <X className="w-5 h-5" />
+                  <X className="w-4 h-4" />
                 </button>
               </div>
 
@@ -214,23 +222,26 @@ export default function HomePage() {
                   onChange={(e) => setAdminPassword(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleAdminAccess()}
                   placeholder="輸入管理員密碼"
-                  className={`game-input w-full ${passwordError ? 'border-red-400 animate-shake' : ''}`}
+                  className={`w-full px-4 py-3 rounded-xl bg-(--game-muted) border-2 text-(--game-fg) font-bold focus:outline-none transition-colors ${passwordError
+                      ? 'border-(--game-error) bg-red-50 focus:border-(--game-error)'
+                      : 'border-transparent focus:border-(--game-accent) focus:bg-white'
+                    }`}
                   autoFocus
                 />
 
                 {passwordError && (
                   <motion.p
-                    className="text-red-500 text-sm"
-                    initial={{ opacity: 0, y: -10 }}
+                    className="text-(--game-error) text-sm font-bold flex items-center gap-1"
+                    initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
                   >
-                    密碼錯誤，請重試
+                    <span>⚠️</span> 密碼錯誤，請重試
                   </motion.p>
                 )}
 
                 <motion.button
                   onClick={handleAdminAccess}
-                  className="game-btn game-btn-primary w-full py-3"
+                  className="w-full py-3 bg-(--game-accent) text-white font-bold rounded-xl shadow-lg shadow-blue-500/20 hover:bg-[#4A7BC4] transition-all"
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                 >

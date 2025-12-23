@@ -4,12 +4,13 @@ import { useState } from 'react'
 import Image from 'next/image'
 
 interface AvatarProps {
-  src: string
+  src: string | null
   alt: string
   fallback: string
   size?: 'sm' | 'md' | 'lg' | 'xl'
-  badge?: 'online' | 'ai' | 'level'
+  badge?: 'online' | 'ai' | 'level' | string
   badgeValue?: string | number
+  className?: string
 }
 
 const sizeClasses = {
@@ -32,13 +33,14 @@ export function Avatar({
   fallback,
   size = 'md',
   badge,
-  badgeValue
+  badgeValue,
+  className = ''
 }: AvatarProps) {
   const [hasError, setHasError] = useState(false)
 
   return (
-    <div className={`relative ${sizeClasses[size]}`}>
-      <div className={`${sizeClasses[size]} rounded-full bg-[#D5E3F7] border-3 border-white shadow-lg overflow-hidden flex items-center justify-center`}>
+    <div className={`relative ${sizeClasses[size]} ${className}`}>
+      <div className={`${sizeClasses[size]} rounded-full bg-(--game-secondary) border-3 border-white shadow-lg overflow-hidden flex items-center justify-center`}>
         {hasError || !src ? (
           <span className={`text-${size === 'lg' ? '5xl' : size === 'md' ? '3xl' : '2xl'} select-none`}>
             {fallback}
@@ -56,21 +58,20 @@ export function Avatar({
       </div>
 
       {badge === 'online' && (
-        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#22c55e] rounded-full border-2 border-white" />
+        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-(--game-success) rounded-full border-2 border-white" />
       )}
 
-      {badge === 'ai' && (
-        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-[#3b82f6] rounded-full border-2 border-white flex items-center justify-center">
-          <span className="text-[8px] text-white font-bold">AI</span>
+      {(badge === 'ai' || (badge && badge !== 'online' && badge !== 'level')) && (
+        <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-(--game-info) rounded-full border-2 border-white flex items-center justify-center">
+          <span className="text-[8px] text-white font-bold">{badge === 'ai' ? 'AI' : badge}</span>
         </div>
       )}
 
       {badge === 'level' && badgeValue && (
-        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-3 py-1 bg-[#5B8BD4] text-white text-xs font-bold rounded-full shadow">
+        <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-3 py-1 bg-(--game-accent) text-white text-xs font-bold rounded-full shadow">
           Lv.{badgeValue}
         </div>
       )}
     </div>
   )
 }
-

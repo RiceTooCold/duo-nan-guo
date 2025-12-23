@@ -3,12 +3,12 @@ import { BookOpen, Sparkles, BarChart3 } from 'lucide-react'
 
 export default function AdminPage() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted">
+        <div className="min-h-screen bg-linear-gradient-to-br from-background via-background to-muted">
             {/* Header */}
             <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
                 <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
+                        <div className="w-10 h-10 rounded-xl bg-linear-gradient-to-br from-primary to-primary/60 flex items-center justify-center">
                             <Sparkles className="w-5 h-5 text-primary-foreground" />
                         </div>
                         <div>
@@ -30,7 +30,7 @@ export default function AdminPage() {
             {/* Hero Section */}
             <main className="max-w-7xl mx-auto px-6 py-16">
                 <div className="text-center mb-16">
-                    <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
+                    <h2 className="text-4xl md:text-5xl font-bold mb-4 bg-linear-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
                         智慧題庫生成工廠
                     </h2>
                     <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
