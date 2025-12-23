@@ -625,7 +625,7 @@ async function finishGame(matchId: string): Promise<void> {
 
 
 /**
- * Trigger bot to answer
+ * Trigger bot to answer (fire-and-forget, non-blocking)
  */
 export async function triggerBotAnswer(matchId: string, botPlayerId: string, questionIndex: number, botModel?: string): Promise<void> {
     const lockKey = `${matchId}:${questionIndex}`;
@@ -654,32 +654,14 @@ export async function triggerBotAnswer(matchId: string, botPlayerId: string, que
     const questionId = match.questionIds[state.currentQuestionIndex];
 
     try {
-        // Get LLM answer using the bot's model
-        const { answer, thinkingMs } = await getBotAnswer(matchId, questionId, botModel);
+        // Get LLM answer (already has 5s timeout built-in)
+        const { answer } = await getBotAnswer(matchId, questionId, botModel);
 
-        // Wait for thinking time
-        await new Promise(resolve => setTimeout(resolve, thinkingMs));
-
-        // Check if still valid (phase, already answered, and time remaining)
-        const currentState = await getGameState(matchId);
-        if (!currentState || currentState.phase !== GamePhase.PLAYING) {
-            return;
-        }
-        if (currentState.playerStates[botPlayerId]?.answer !== null) {
-            return;
-        }
-        // Check if time is still valid (with 500ms buffer)
-        if (Date.now() > currentState.endTime - 500) {
-            console.log(`⏱️ [Bot] Time ran out for match ${matchId.slice(-4)}, skipping answer`);
-            return; // Let timeout handler manage this
-        }
-
-        // Submit answer
+        // Submit immediately without extra delay
         await submitAnswer(matchId, botPlayerId, answer);
     } catch (error) {
         console.error('Bot answer error:', error);
     } finally {
-        // Release lock
         botProcessingLocks.delete(lockKey);
     }
 }

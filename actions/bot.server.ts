@@ -39,10 +39,12 @@ interface BotAnswerResult {
     confidence: number;     // Fixed value since we removed difficulty
 }
 
+// Timeout constant for LLM calls (5 seconds to stay within Vercel limits)
+const BOT_TIMEOUT_MS = 5000;
+
 /**
  * Get LLM Bot's answer for a question.
- * Uses Vercel AI SDK for unified model interface.
- * The model responds naturally without artificial difficulty adjustment.
+ * Uses Vercel AI SDK with timeout to prevent Vercel function timeouts.
  */
 export async function getBotAnswer(
     matchId: string,
@@ -56,52 +58,47 @@ export async function getBotAnswer(
             select: {
                 stimulus: true,
                 interaction: true,
-                targetLanguage: true,
-                rank: true,
             },
         });
 
         if (!question) {
-            console.warn(`Question ${questionId} not found, returning random answer`);
+            console.warn(`Question ${questionId} not found`);
             return getRandomFallback();
         }
 
         const options = question.interaction as Record<string, string>;
 
-        // 2. Build simple prompt - let model respond naturally
-        const prompt = `You are taking a ${question.targetLanguage} language exam.
+        // 2. Simplified prompt for faster response
+        const prompt = `${question.stimulus}\nA)${options.a} B)${options.b} C)${options.c} D)${options.d}\nAnswer with just A/B/C/D:`;
 
-Question: ${question.stimulus}
-
-Options:
-A) ${options.a}
-B) ${options.b}
-C) ${options.c}
-D) ${options.d}
-
-Reply with ONLY the letter (A, B, C, or D) that you think is correct. No explanation.`;
-
-        // 3. Call model via Vercel AI SDK
+        // 3. Call model with timeout
         const startTime = Date.now();
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), BOT_TIMEOUT_MS);
 
-        const { text } = await generateText({
-            model: getModel(botModel),
-            prompt,
-            temperature: 0.3,
-        });
+        try {
+            const { text } = await generateText({
+                model: getModel(botModel),
+                prompt,
+                temperature: 0.2,
+                abortSignal: controller.signal,
+            });
 
-        const thinkingMs = Date.now() - startTime;
+            clearTimeout(timeoutId);
+            const thinkingMs = Date.now() - startTime;
 
-        // 4. Parse response
-        const response = text.trim().toUpperCase();
-        const answerMatch = response.match(/^[ABCD]/);
-        const answer = answerMatch ? answerMatch[0].toLowerCase() : getRandomAnswer();
+            // 4. Parse response
+            const answerMatch = text.trim().toUpperCase().match(/[ABCD]/);
+            const answer = answerMatch ? answerMatch[0].toLowerCase() : getRandomAnswer();
 
-        return {
-            answer,
-            thinkingMs,
-            confidence: 0.8, // Fixed confidence since we removed difficulty
-        };
+            return { answer, thinkingMs, confidence: 0.8 };
+        } catch (abortError) {
+            clearTimeout(timeoutId);
+            if (controller.signal.aborted) {
+                console.warn(`Bot ${botModel} timed out after ${BOT_TIMEOUT_MS}ms`);
+            }
+            return getRandomFallback();
+        }
 
     } catch (error) {
         console.error('Bot answer error:', error);

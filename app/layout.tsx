@@ -16,6 +16,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Duo-Nan-Guo",
   description: "AI-powered language exam training",
+  icons: {
+    icon: "/duonanguo_favicon.png",
+  },
 };
 
 export default function RootLayout({
