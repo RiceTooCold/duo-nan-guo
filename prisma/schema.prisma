@@ -109,7 +109,8 @@ enum MatchStatus {
   waiting   // Waiting for players
   playing   // In progress
   finished  // Completed
-  cancelled // Cancelled
+  cancelled // Cancelled by user
+  abandoned // Abandoned (stuck game, cleaned by cron)
 }
 
 // ============================================

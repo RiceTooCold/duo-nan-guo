@@ -49,6 +49,14 @@ export async function getMatch(matchId: string): Promise<GameInitResult> {
         return { error: 'MATCH_FINISHED' };
     }
 
+    // Check if match is cancelled or abandoned
+    if (match.status === MatchStatus.cancelled) {
+        return { error: 'MATCH_CANCELLED' };
+    }
+    if (match.status === MatchStatus.abandoned) {
+        return { error: 'MATCH_ABANDONED' };
+    }
+
     // Check if match is expired (created more than 1 hour ago)
     const ONE_HOUR_MS = 60 * 60 * 1000;
     if (Date.now() - match.createdAt.getTime() > ONE_HOUR_MS) {
@@ -246,16 +254,25 @@ import { getGameState } from '@/lib/game-engine/server/GameStore';
 
 /**
  * Initialize and start a game room
+ * Returns the latest state (handles both new games and reconnecting players)
  */
 export async function initAndStartGameRoom(matchId: string) {
     try {
-        // Initialize room
+        // Initialize room (idempotent - returns existing state if already playing)
         await initRoom(matchId);
 
-        // Start first round
-        const state = await startGameRound(matchId);
+        // Start first round (idempotent - skips if already PLAYING)
+        await startGameRound(matchId);
 
-        return { success: true, state };
+        // Always fetch the LATEST state to return
+        // This ensures reconnecting players get the current game state
+        const latestState = await getGameState(matchId);
+
+        if (!latestState) {
+            return { success: false, error: 'Failed to get game state' };
+        }
+
+        return { success: true, state: latestState };
     } catch (error) {
         console.error('initAndStartGameRoom error:', error);
         return { success: false, error: (error as Error).message };
@@ -300,16 +317,20 @@ export async function reportTimeout(matchId: string) {
 
 import { rankToLevel } from '@/lib/config/game';
 import type { GameResult, PlayerResult } from '@/types/game';
+import { getServerSession } from 'next-auth';
+import authOptions from '@/lib/auth';
 
 /**
  * Get match result for display on results page
+ * Uses server session to automatically determine which player is viewing
  * Returns null if match not found or not finished
  */
-export async function getMatchResult(
-    matchId: string,
-    selfPlayerId: string = 'player_1'
-): Promise<GameResult | null> {
+export async function getMatchResult(matchId: string): Promise<GameResult | null> {
     try {
+        // Get current user from server session
+        const session = await getServerSession(authOptions);
+        const userId = session?.user?.id;
+
         const match = await prisma.match.findUnique({
             where: { id: matchId },
             select: {
@@ -327,9 +348,31 @@ export async function getMatchResult(
             return null;
         }
 
-        // Find self and opponent
-        const selfPlayer = match.players.find(p => p.playerId === selfPlayerId);
-        const opponentPlayer = match.players.find(p => p.playerId !== selfPlayerId);
+        // Fetch AnswerRecords for all players in this match
+        const answerRecords = await prisma.answerRecord.findMany({
+            where: { matchId },
+            select: {
+                userId: true,
+                responseTimeMs: true,
+            },
+        });
+
+        // Group response times by userId
+        const responseTimesByUser = new Map<string, number[]>();
+        for (const record of answerRecords) {
+            if (!record.userId) continue; // Skip if userId is null
+            const times = responseTimesByUser.get(record.userId) || [];
+            times.push(record.responseTimeMs);
+            responseTimesByUser.set(record.userId, times);
+        }
+
+        // Find self player based on session userId, fallback to player_1 for logged-out users
+        let selfPlayer = match.players.find(p => p.userId === userId);
+        if (!selfPlayer) {
+            // Fallback: if no session or user not in match (e.g. spectator), use player_1
+            selfPlayer = match.players.find(p => p.playerId === 'player_1');
+        }
+        const opponentPlayer = match.players.find(p => p.playerId !== selfPlayer?.playerId);
 
         if (!selfPlayer || !opponentPlayer) {
             return null;
@@ -348,6 +391,13 @@ export async function getMatchResult(
                 maxStreak = liveState.playerStates[player.playerId].maxStreak || 0;
             }
 
+            // Calculate average response time
+            const responseTimes = player.userId ? responseTimesByUser.get(player.userId) || [] : [];
+            const avgResponseTimeMs = responseTimes.length > 0
+                ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
+                : 0;
+            const avgResponseTime = Math.round(avgResponseTimeMs / 100) / 10; // Convert to seconds with 1 decimal
+
             return {
                 id: player.playerId,
                 name: player.name,
@@ -357,6 +407,7 @@ export async function getMatchResult(
                 correctAnswers,
                 accuracy: totalQuestions > 0 ? Math.round((correctAnswers / totalQuestions) * 100) : 0,
                 maxStreak,
+                avgResponseTime,
             };
         };
 
@@ -386,3 +437,323 @@ export async function getMatchResult(
         return null;
     }
 }
+
+// ============================================
+// Room System Functions (for unified waiting room)
+// ============================================
+
+import { pusherServer, getRoomChannel, ROOM_EVENTS } from '@/lib/pusher';
+
+/**
+ * Info about a waiting match (for room list)
+ */
+export interface WaitingMatchInfo {
+    id: string;
+    targetLanguage: TargetLanguage;
+    rank: number;
+    questionCount: number;
+    hostName: string;
+    hostAvatar: string | null;
+    createdAt: Date;
+}
+
+/**
+ * Create a waiting match (acts as "room")
+ * For Bot mode: botId is required, bot added immediately
+ * For PvP mode: botId is null, second player joins later
+ */
+export async function createWaitingMatch(
+    userId: string,
+    config: {
+        targetLanguage: TargetLanguage;
+        rank: number;
+        questionCount: number;
+        isBot: boolean;
+        botId?: string;
+    }
+): Promise<{ matchId: string }> {
+    // 1. Fetch questions
+    const allQuestionIds = await prisma.question.findMany({
+        where: {
+            targetLanguage: config.targetLanguage,
+            rank: config.rank,
+        },
+        select: { id: true },
+    });
+
+    if (allQuestionIds.length === 0) {
+        throw new Error(`No questions found for ${config.targetLanguage} rank ${config.rank}.`);
+    }
+
+    const questionCount = Math.min(allQuestionIds.length, config.questionCount);
+    const shuffled = allQuestionIds.sort(() => 0.5 - Math.random());
+    const selectedIds = shuffled.slice(0, questionCount).map((q) => q.id);
+
+    // 2. Get host user info
+    const hostUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { name: true, image: true }
+    });
+
+    const players: MatchPlayer[] = [
+        {
+            userId: userId,
+            playerId: 'player_1',
+            name: hostUser?.name || 'Player',
+            avatar: hostUser?.image || null,
+            isBot: false,
+            botModel: null,
+            finalScore: 0,
+        },
+    ];
+
+    // 3. If bot mode, add bot as player_2
+    if (config.isBot && config.botId) {
+        const botUser = await prisma.user.findUnique({
+            where: { id: config.botId },
+            select: { id: true, name: true, image: true, botModel: true }
+        });
+        if (botUser) {
+            players.push({
+                userId: botUser.id,
+                playerId: 'player_2',
+                name: botUser.name || 'Bot',
+                avatar: botUser.image,
+                isBot: true,
+                botModel: botUser.botModel,
+                finalScore: 0,
+            });
+        }
+    }
+
+    // 4. Create match with 'waiting' status
+    const match = await prisma.match.create({
+        data: {
+            mode: MatchMode.duel,
+            targetLanguage: config.targetLanguage,
+            rank: config.rank,
+            questionCount: questionCount,
+            timePerQuestion: 10,
+            status: MatchStatus.waiting,
+            questionIds: selectedIds,
+            players: players,
+        },
+    });
+
+    return { matchId: match.id };
+}
+
+/**
+ * Get list of waiting PvP matches (for /join page)
+ */
+export async function getWaitingMatches(filter?: {
+    targetLanguage?: TargetLanguage;
+}): Promise<WaitingMatchInfo[]> {
+    const tenMinutesAgo = new Date(Date.now() - 10 * 60 * 1000);
+
+    const matches = await prisma.match.findMany({
+        where: {
+            status: MatchStatus.waiting,
+            createdAt: { gt: tenMinutesAgo },
+            ...(filter?.targetLanguage && { targetLanguage: filter.targetLanguage }),
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+    });
+
+    // Filter to only matches with 1 player (waiting for guest)
+    const waitingMatches = matches.filter(m => m.players.length === 1);
+
+    return waitingMatches.map(m => ({
+        id: m.id,
+        targetLanguage: m.targetLanguage,
+        rank: m.rank,
+        questionCount: m.questionCount,
+        hostName: m.players[0]?.name || 'Player',
+        hostAvatar: m.players[0]?.avatar || null,
+        createdAt: m.createdAt,
+    }));
+}
+
+/**
+ * Join a waiting match as player_2
+ * Uses transaction to prevent concurrent join race condition
+ */
+export async function joinWaitingMatch(
+    matchId: string,
+    userId: string
+): Promise<{ success: boolean; error?: string }> {
+    try {
+        // Use transaction for atomic read-check-update
+        const result = await prisma.$transaction(async (tx) => {
+            // 1. Get match and validate (within transaction)
+            const match = await tx.match.findUnique({
+                where: { id: matchId },
+            });
+
+            if (!match) {
+                return { success: false, error: 'Match not found' };
+            }
+
+            if (match.status !== MatchStatus.waiting) {
+                return { success: false, error: 'Match is no longer waiting' };
+            }
+
+            if (match.players.length >= 2) {
+                return { success: false, error: 'Match is full' };
+            }
+
+            // 2. Get joining user info
+            const user = await tx.user.findUnique({
+                where: { id: userId },
+                select: { name: true, image: true }
+            });
+
+            const newPlayer = {
+                userId: userId,
+                playerId: 'player_2',
+                name: user?.name || 'Player',
+                avatar: user?.image || null,
+                isBot: false,
+                finalScore: 0,
+            };
+
+            // 3. Add player to match (atomic within transaction)
+            await tx.match.update({
+                where: { id: matchId },
+                data: {
+                    players: [...match.players, newPlayer],
+                },
+            });
+
+            return { success: true, player: newPlayer };
+        });
+
+        if (!result.success) {
+            return { success: false, error: result.error };
+        }
+
+        // 4. Broadcast player joined (outside transaction)
+        await pusherServer.trigger(
+            getRoomChannel(matchId),
+            ROOM_EVENTS.PLAYER_JOINED,
+            { player: result.player }
+        );
+
+        return { success: true };
+    } catch (error) {
+        console.error('joinWaitingMatch error:', error);
+        return { success: false, error: 'Failed to join match' };
+    }
+}
+
+/**
+ * Trigger bot "join" for Bot mode waiting room
+ * Bot is already in players[], this just broadcasts for UI update
+ */
+export async function triggerBotJoin(matchId: string): Promise<void> {
+    const match = await prisma.match.findUnique({
+        where: { id: matchId },
+    });
+
+    if (!match || match.players.length < 2) return;
+
+    const botPlayer = match.players.find(p => p.isBot);
+    if (!botPlayer) return;
+
+    // Broadcast that bot "joined"
+    await pusherServer.trigger(
+        getRoomChannel(matchId),
+        ROOM_EVENTS.PLAYER_JOINED,
+        { player: botPlayer }
+    );
+}
+
+/**
+ * Start the waiting match (changes status to 'playing')
+ * Called after countdown in waiting room
+ */
+export async function startWaitingMatch(matchId: string): Promise<void> {
+    await prisma.match.update({
+        where: { id: matchId },
+        data: {
+            status: MatchStatus.playing,
+            startedAt: new Date(),
+        },
+    });
+
+    // Broadcast game started
+    await pusherServer.trigger(
+        getRoomChannel(matchId),
+        ROOM_EVENTS.GAME_STARTED,
+        { matchId }
+    );
+}
+
+/**
+ * Get basic match info for waiting room
+ */
+export async function getMatchInfo(matchId: string): Promise<{
+    id: string;
+    targetLanguage: TargetLanguage;
+    rank: number;
+    questionCount: number;
+    status: MatchStatus;
+    players: MatchPlayer[];
+    isBot: boolean;
+} | null> {
+    const match = await prisma.match.findUnique({
+        where: { id: matchId },
+    });
+
+    if (!match) return null;
+
+    return {
+        id: match.id,
+        targetLanguage: match.targetLanguage,
+        rank: match.rank,
+        questionCount: match.questionCount,
+        status: match.status,
+        players: match.players,
+        isBot: match.players.some(p => p.isBot),
+    };
+}
+
+/**
+ * Leave/cancel a waiting room
+ * If host leaves, cancels the match
+ */
+export async function leaveWaitingMatch(
+    matchId: string,
+    userId: string
+): Promise<void> {
+    const match = await prisma.match.findUnique({
+        where: { id: matchId },
+    });
+
+    if (!match || match.status !== MatchStatus.waiting) return;
+
+    const isHost = match.players[0]?.userId === userId;
+
+    if (isHost) {
+        // Host leaving cancels the match
+        await prisma.match.update({
+            where: { id: matchId },
+            data: { status: MatchStatus.cancelled },
+        });
+
+        await pusherServer.trigger(
+            getRoomChannel(matchId),
+            ROOM_EVENTS.HOST_LEFT,
+            {}
+        );
+    } else {
+        // Guest leaving removes them from players
+        const updatedPlayers = match.players.filter(p => p.userId !== userId);
+        await prisma.match.update({
+            where: { id: matchId },
+            data: { players: updatedPlayers },
+        });
+    }
+}
+

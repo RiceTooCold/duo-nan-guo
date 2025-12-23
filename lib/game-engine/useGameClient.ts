@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useSession } from 'next-auth/react';
 import { GamePhase } from '@/types/game';
 import { getPusherClient, getMatchChannel, PUSHER_EVENTS } from '@/lib/pusher';
 import {
@@ -28,9 +29,10 @@ interface UseGameClientReturn {
 
 /**
  * Game client hook with perspective transformation
- * Takes player-agnostic LiveGameState and transforms to ClientGameView
+ * Automatically detects selfPlayerId from auth session
  */
-export function useGameClient(matchId: string, selfPlayerId: string): UseGameClientReturn {
+export function useGameClient(matchId: string): UseGameClientReturn {
+    const { data: authSession } = useSession();
     const [liveState, setLiveState] = useState<LiveGameState | null>(null);
     const [session, setSession] = useState<GameSession | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +42,13 @@ export function useGameClient(matchId: string, selfPlayerId: string): UseGameCli
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const initializedRef = useRef(false);
     const timeoutReportedRef = useRef(false);
+
+    // Determine selfPlayerId from session + game data
+    const selfPlayerId = useMemo(() => {
+        if (!authSession?.user?.id || !session?.players) return 'player_1'; // fallback
+        const myPlayer = session.players.find(p => p.userId === authSession.user.id);
+        return myPlayer?.playerId || 'player_1';
+    }, [authSession?.user?.id, session?.players]);
 
     // Find opponent playerId from session
     const opponentPlayerId = useMemo(() => {
@@ -173,6 +182,36 @@ export function useGameClient(matchId: string, selfPlayerId: string): UseGameCli
         };
     }, [liveState?.phase, liveState?.endTime, updateTimeLeft]);
 
+    // Visibility change detection - sync state when tab becomes visible
+    useEffect(() => {
+        if (!matchId) return;
+
+        const handleVisibilityChange = async () => {
+            if (document.visibilityState === 'visible') {
+                console.log('👁️ [Visibility] Tab became visible, syncing state...');
+                try {
+                    // Re-fetch latest state when tab becomes visible
+                    const result = await initAndStartGameRoom(matchId);
+                    if (result.success && result.state) {
+                        setLiveState(result.state as LiveGameState);
+                        // Also update timeLeft immediately
+                        if (result.state.endTime) {
+                            updateTimeLeft(result.state.endTime);
+                        }
+                    }
+                } catch (err) {
+                    console.error('Visibility sync error:', err);
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
+    }, [matchId, updateTimeLeft]);
+
     // Handle timeout
     const handleTimeout = useCallback(async () => {
         if (timeoutReportedRef.current) return;
@@ -186,11 +225,25 @@ export function useGameClient(matchId: string, selfPlayerId: string): UseGameCli
     }, [matchId]);
 
     // Auto-report timeout when timeLeft reaches 0
+    // player_1 reports immediately, player_2 waits 1.5s as fallback (in case player_1 is offline)
     useEffect(() => {
         if (timeLeft <= 0 && liveState?.phase === GamePhase.PLAYING) {
-            handleTimeout();
+            if (selfPlayerId === 'player_1') {
+                // Leader: report immediately
+                handleTimeout();
+            } else {
+                // Fallback: wait 1.5 seconds before reporting (gives player_1 time to report first)
+                const fallbackTimer = setTimeout(() => {
+                    // Only report if still in PLAYING phase (player_1 didn't report)
+                    if (liveState?.phase === GamePhase.PLAYING) {
+                        console.log('⏰ [Fallback] Player2 reporting timeout (player_1 may be offline)');
+                        handleTimeout();
+                    }
+                }, 1500);
+                return () => clearTimeout(fallbackTimer);
+            }
         }
-    }, [timeLeft, liveState?.phase, handleTimeout]);
+    }, [timeLeft, liveState?.phase, handleTimeout, selfPlayerId]);
 
     // Submit answer (use actual playerId, not 'self')
     const handleAnswer = useCallback(async (answer: string) => {

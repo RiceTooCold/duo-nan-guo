@@ -70,7 +70,7 @@ export default function HistoryPage() {
                 ) : matches.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-[#64748b]">尚無對戰紀錄</p>
-                        <Link href="/room" className="text-[#5B8BD4] font-medium mt-2 inline-block">
+                        <Link href="/play" className="text-[#5B8BD4] font-medium mt-2 inline-block">
                             開始你的第一場對戰 →
                         </Link>
                     </div>

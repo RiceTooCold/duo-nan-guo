@@ -68,6 +68,7 @@ export interface PlayerResult {
   correctAnswers: number;
   accuracy: number;
   maxStreak: number;
+  avgResponseTime: number; // Average response time in seconds
 }
 
 export interface GameResult {

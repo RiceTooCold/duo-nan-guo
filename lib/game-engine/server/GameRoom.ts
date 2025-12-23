@@ -29,6 +29,7 @@ const botProcessingLocks = new Set<string>();
 
 /**
  * Initialize a game room from a match
+ * IDEMPOTENT: If already playing, returns existing state
  */
 export async function initGameRoom(matchId: string): Promise<LiveGameState> {
     // Get match data
@@ -39,11 +40,18 @@ export async function initGameRoom(matchId: string): Promise<LiveGameState> {
             questionIds: true,
             timePerQuestion: true,
             status: true,
+            liveState: true,
         },
     });
 
     if (!match) {
         throw new Error('Match not found');
+    }
+
+    // IDEMPOTENCY: If already playing, return existing state
+    if (match.status === MatchStatus.playing && match.liveState) {
+        console.log(`✅ [initGameRoom] Match ${matchId.slice(-4)} already playing, returning existing state`);
+        return match.liveState as unknown as LiveGameState;
     }
 
     if (match.players.length < 2) {
@@ -77,10 +85,17 @@ export async function initGameRoom(matchId: string): Promise<LiveGameState> {
 
 /**
  * Start a round (set endTime and trigger bot if needed)
+ * GUARD: If already PLAYING, returns current state
  */
 export async function startRound(matchId: string): Promise<LiveGameState> {
     const state = await getGameState(matchId);
     if (!state) throw new Error('Game not found');
+
+    // Guard: If already playing, return current state
+    if (state.phase === GamePhase.PLAYING) {
+        console.log(`⚠️ [startRound] Skipped - already in PLAYING phase`);
+        return state;
+    }
 
     // Get match to find bot player
     const match = await prisma.match.findUnique({
@@ -155,7 +170,10 @@ export async function submitAnswer(
                 }
 
                 if (Date.now() > state.endTime) {
-                    throw new Error('Time is up');
+                    // Time is up - return current state instead of error
+                    // The timeout handler will mark unanswered players
+                    console.log(`⏱️ [submitAnswer] Time expired for ${playerId}, ignoring late answer`);
+                    return state;
                 }
 
                 const playerState = state.playerStates[playerId];
@@ -286,74 +304,93 @@ export async function submitAnswer(
 
 /**
  * Handle timeout (called by client when endTime is reached)
- * Uses transaction for concurrency safety
+ * Uses transaction with retry logic for concurrency safety
  */
 export async function handleTimeout(matchId: string): Promise<LiveGameState> {
-    return await prisma.$transaction(async (tx) => {
-        // 1. Read current state within transaction
-        const match = await tx.match.findUnique({
-            where: { id: matchId },
-            select: {
-                liveState: true,
-                questionIds: true,
-            },
-        });
+    let attempt = 0;
+    while (attempt < 3) {
+        try {
+            return await prisma.$transaction(async (tx) => {
+                // 1. Read current state within transaction
+                const match = await tx.match.findUnique({
+                    where: { id: matchId },
+                    select: {
+                        liveState: true,
+                        questionIds: true,
+                    },
+                });
 
-        if (!match?.liveState) throw new Error('Game not found');
-        const state = match.liveState as unknown as LiveGameState;
+                if (!match?.liveState) throw new Error('Game not found');
+                const state = match.liveState as unknown as LiveGameState;
 
-        if (state.phase !== GamePhase.PLAYING) {
-            return state; // Already handled
-        }
+                if (state.phase !== GamePhase.PLAYING) {
+                    return state; // Already handled
+                }
 
-        // Validate that time is actually up (allow 1s buffer for clock skew)
-        // This prevents stale timeout requests from previous rounds affecting new rounds
-        if (Date.now() < state.endTime - 1000) {
-            console.warn(`⚠️ [handleTimeout] Rejected premature timeout. EndTime: ${state.endTime}, Now: ${Date.now()}`);
-            return state;
-        }
+                // Validate that time is actually up (allow 1s buffer for clock skew)
+                if (Date.now() < state.endTime - 1000) {
+                    console.warn(`⚠️ [handleTimeout] Rejected premature timeout. EndTime: ${state.endTime}, Now: ${Date.now()}`);
+                    return state;
+                }
 
-        // 2. Get correct answer
-        const questionId = match.questionIds[state.currentQuestionIndex];
-        const question = await tx.question.findUnique({
-            where: { id: questionId },
-            select: { correctAnswer: true },
-        });
+                // 2. Get correct answer
+                const questionId = match.questionIds[state.currentQuestionIndex];
+                const question = await tx.question.findUnique({
+                    where: { id: questionId },
+                    select: { correctAnswer: true },
+                });
 
-        // 3. Mark unanswered players as wrong
-        const newPlayerStates: { [playerId: string]: PlayerGameState } = {};
-        for (const [playerId, playerState] of Object.entries(state.playerStates)) {
-            if (playerState.answer === null) {
-                newPlayerStates[playerId] = {
-                    ...playerState,
-                    answer: '',
-                    isCorrect: false,
-                    streak: 0,
+                // 3. Mark unanswered players as wrong
+                const newPlayerStates: { [playerId: string]: PlayerGameState } = {};
+                for (const [playerId, playerState] of Object.entries(state.playerStates)) {
+                    if (playerState.answer === null) {
+                        newPlayerStates[playerId] = {
+                            ...playerState,
+                            answer: '',
+                            isCorrect: false,
+                            streak: 0,
+                        };
+                    } else {
+                        newPlayerStates[playerId] = playerState;
+                    }
+                }
+
+                const newState: LiveGameState = {
+                    ...state,
+                    phase: GamePhase.RESOLVING,
+                    playerStates: newPlayerStates,
+                    correctAnswer: question?.correctAnswer || null,
                 };
-            } else {
-                newPlayerStates[playerId] = playerState;
+
+                // 4. Save state atomically within transaction
+                await tx.match.update({
+                    where: { id: matchId },
+                    data: { liveState: newState as unknown as object },
+                });
+
+                // 5. Broadcast and schedule next action
+                await broadcastState(matchId, newState);
+                scheduleNextAction(matchId, match.questionIds.length);
+
+                return newState;
+            });
+        } catch (error: unknown) {
+            attempt++;
+            const isConflict = error instanceof PrismaClientKnownRequestError &&
+                (error.code === 'P2002' ||
+                    error.message?.includes('WriteConflict') ||
+                    error.message?.includes('conflict') ||
+                    error.message?.includes('deadlock'));
+
+            if (isConflict && attempt < 3) {
+                console.warn(`🔄 [handleTimeout] Retry attempt ${attempt} due to conflict`);
+                await new Promise(r => setTimeout(r, Math.random() * 100)); // Backoff
+                continue;
             }
+            throw error;
         }
-
-        const newState: LiveGameState = {
-            ...state,
-            phase: GamePhase.RESOLVING,
-            playerStates: newPlayerStates,
-            correctAnswer: question?.correctAnswer || null,
-        };
-
-        // 4. Save state atomically within transaction
-        await tx.match.update({
-            where: { id: matchId },
-            data: { liveState: newState as unknown as object },
-        });
-
-        // 5. Broadcast and schedule next action
-        await broadcastState(matchId, newState);
-        scheduleNextAction(matchId, match.questionIds.length);
-
-        return newState;
-    });
+    }
+    throw new Error('Max retries reached');
 }
 
 /**
@@ -381,10 +418,17 @@ async function scheduleNextAction(matchId: string, totalQuestions: number) {
 
 /**
  * Move to next question
+ * GUARD: Only proceeds if in RESOLVING phase
  */
 async function nextQuestion(matchId: string): Promise<void> {
     const state = await getGameState(matchId);
     if (!state) return;
+
+    // Guard: Only proceed if we're in RESOLVING phase
+    if (state.phase !== GamePhase.RESOLVING) {
+        console.log(`⚠️ [nextQuestion] Skipped - not in RESOLVING phase (current: ${state.phase})`);
+        return;
+    }
 
     const newState: LiveGameState = {
         ...state,
@@ -403,10 +447,17 @@ async function nextQuestion(matchId: string): Promise<void> {
 
 /**
  * Finish the game - write AnswerRecords and update UserStats
+ * GUARD: Only proceeds if in RESOLVING phase
  */
 async function finishGame(matchId: string): Promise<void> {
     const state = await getGameState(matchId);
     if (!state) return;
+
+    // Guard: Only proceed if we're in RESOLVING phase (not already FINISHED)
+    if (state.phase === GamePhase.FINISHED) {
+        console.log(`⚠️ [finishGame] Skipped - already FINISHED`);
+        return;
+    }
 
     // Get match with full data for analytics
     const match = await prisma.match.findUnique({
@@ -416,9 +467,16 @@ async function finishGame(matchId: string): Promise<void> {
             players: true,
             questionIds: true,
             liveState: true,
+            status: true, // Check if already finished
         },
     });
     if (!match) return;
+
+    // Double-check: if match is already finished in DB, skip
+    if (match.status === MatchStatus.finished) {
+        console.log(`⚠️ [finishGame] Skipped - match already finished in DB`);
+        return;
+    }
 
     // Calculate winner (highest score) - winner is the playerId with highest score
     let winnerPlayerId: string | null = null;
@@ -559,13 +617,18 @@ export async function triggerBotAnswer(matchId: string, botPlayerId: string, que
         // Wait for thinking time
         await new Promise(resolve => setTimeout(resolve, thinkingMs));
 
-        // Check if still valid
+        // Check if still valid (phase, already answered, and time remaining)
         const currentState = await getGameState(matchId);
         if (!currentState || currentState.phase !== GamePhase.PLAYING) {
             return;
         }
         if (currentState.playerStates[botPlayerId]?.answer !== null) {
             return;
+        }
+        // Check if time is still valid (with 500ms buffer)
+        if (Date.now() > currentState.endTime - 500) {
+            console.log(`⏱️ [Bot] Time ran out for match ${matchId.slice(-4)}, skipping answer`);
+            return; // Let timeout handler manage this
         }
 
         // Submit answer

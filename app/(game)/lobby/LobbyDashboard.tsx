@@ -146,7 +146,7 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
             {/* Main Content Area */}
             <main className="flex-1 px-6 flex flex-col gap-6 pb-6">
 
-                {/* Hero / Start Battle */}
+                {/* Hero / Game Actions */}
                 <motion.section
                     className="relative"
                     initial={{ opacity: 0, y: 20 }}
@@ -155,7 +155,7 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                 >
                     <div className="relative overflow-visible bg-linear-to-br from-[#5B8BD4] to-[#4A7BC4] rounded-3xl p-6 shadow-xl shadow-[#5B8BD4]/30 text-white min-h-[160px] flex flex-col justify-center">
 
-                        {/* Mascot Image - Positioned absolutely to break out of container */}
+                        {/* Mascot Image */}
                         <div className="absolute -right-4 -bottom-6 w-50 h-50 pointer-events-none">
                             <Image
                                 src="/mascot-parrot.png"
@@ -169,19 +169,31 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                         <div className="relative z-10 w-[65%]">
                             <h3 className="text-2xl font-bold mb-1">戰鬥時刻！</h3>
                             <p className="text-blue-100 text-sm mb-4 font-medium leading-relaxed">
-                                加入競技場，測試你的實力！
+                                創建或加入房間，挑戰對手！
                             </p>
 
-                            <Link href="/room">
-                                <motion.button
-                                    className="px-6 py-3 bg-white text-[#5B8BD4] font-bold rounded-xl shadow-lg flex items-center gap-2 group"
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                >
-                                    <Sword className="w-5 h-5 fill-current" />
-                                    <span>開始對戰</span>
-                                </motion.button>
-                            </Link>
+                            <div className="flex gap-2">
+                                <Link href="/play">
+                                    <motion.button
+                                        className="px-4 py-2.5 bg-white text-[#5B8BD4] font-bold rounded-xl shadow-lg flex items-center gap-1.5 text-sm"
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <Sword className="w-4 h-4 fill-current" />
+                                        <span>創建房間</span>
+                                    </motion.button>
+                                </Link>
+                                <Link href="/join">
+                                    <motion.button
+                                        className="px-4 py-2.5 bg-white/20 text-white font-bold rounded-xl shadow-lg flex items-center gap-1.5 text-sm border border-white/30"
+                                        whileHover={{ scale: 1.05, backgroundColor: 'rgba(255,255,255,0.3)' }}
+                                        whileTap={{ scale: 0.95 }}
+                                    >
+                                        <User className="w-4 h-4" />
+                                        <span>加入房間</span>
+                                    </motion.button>
+                                </Link>
+                            </div>
                         </div>
 
                         {/* Background Decor */}
