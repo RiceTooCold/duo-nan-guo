@@ -85,6 +85,7 @@ export function useGameClient(matchId: string): UseGameClientReturn {
                 maxStreak: selfState.maxStreak,
                 answer: selfState.answer,
                 isCorrect: selfState.isCorrect,
+                lastScoreChange: selfState.lastScoreChange ?? 0,
             },
             opponent: {
                 playerId: opponentPlayerId,
@@ -96,6 +97,7 @@ export function useGameClient(matchId: string): UseGameClientReturn {
                 maxStreak: opponentState.maxStreak,
                 answer: opponentState.answer,
                 isCorrect: opponentState.isCorrect,
+                lastScoreChange: opponentState.lastScoreChange ?? 0,
             },
             correctAnswer: liveState.correctAnswer,
             winnerId: liveState.winnerId,

@@ -80,3 +80,62 @@ export function rankToLevel(langId: TargetLanguage, rank: number): string {
 
 /** Question count options */
 export const questionCounts = [5, 10, 20] as const
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Scoring Configuration
+// ─────────────────────────────────────────────────────────────────────────────
+
+export const SCORING_CONFIG = {
+    /** Base score for correct answer */
+    baseScore: 100,
+
+    /** Maximum speed bonus points */
+    speedBonusMax: 50,
+
+    /** Speed bonus window as ratio of time limit (0.7 = 70%) */
+    speedBonusWindowRatio: 0.7,
+
+    /** Combo multipliers for streak (index = streak count, max at 5+) */
+    comboMultipliers: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5] as const,
+
+    /** Time per question in milliseconds */
+    timePerQuestionMs: 15000,
+} as const
+
+/**
+ * Calculate score for an answer
+ * 
+ * Formula:
+ * - Base: 100 points
+ * - Speed Bonus: 0-50 points (linear decay, only within 70% of time limit)
+ * - Combo Multiplier: 1.0x to 1.5x based on streak
+ * 
+ * @param isCorrect Whether the answer is correct
+ * @param responseTimeMs Time taken to answer in milliseconds
+ * @param streak Current correct answer streak (before this answer)
+ * @returns Score earned (0 if incorrect)
+ */
+export function calculateScore(
+    isCorrect: boolean,
+    responseTimeMs: number,
+    streak: number
+): number {
+    if (!isCorrect) return 0
+
+    const { baseScore, speedBonusMax, speedBonusWindowRatio, comboMultipliers, timePerQuestionMs } = SCORING_CONFIG
+
+    // Speed Window = 70% of 15s = 10.5s = 10500ms
+    const speedWindowMs = timePerQuestionMs * speedBonusWindowRatio
+
+    // Speed Bonus: linear decay within window (faster = more points)
+    // If responseTime >= speedWindow, speedBonus = 0
+    // If responseTime = 0, speedBonus = speedBonusMax (50)
+    const speedRatio = Math.max(0, 1 - (responseTimeMs / speedWindowMs))
+    const speedBonus = Math.round(speedBonusMax * speedRatio)
+
+    // Combo Multiplier: streak 0 = 1.0x, 1 = 1.1x, ... 5+ = 1.5x
+    const comboIndex = Math.min(streak, comboMultipliers.length - 1)
+    const multiplier = comboMultipliers[comboIndex]
+
+    return Math.round((baseScore + speedBonus) * multiplier)
+}

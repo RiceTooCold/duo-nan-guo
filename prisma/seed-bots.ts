@@ -15,14 +15,7 @@ const BOT_USERS = [
         botModel: 'gemma-3-27b-it',
         role: UserRole.user,
         image: '/gemma.png',
-        stats: {
-            totalMatches: 0,
-            wins: 0,
-            losses: 0,
-            ties: 0,
-            correctRate: 0,
-            totalXp: 0,
-        },
+        // Note: stats are now calculated on-the-fly from Match/AnswerRecord
     },
     {
         name: 'Llama',
@@ -31,14 +24,6 @@ const BOT_USERS = [
         botModel: 'llama-3.3-70b-versatile',
         role: UserRole.user,
         image: '/llama.png',
-        stats: {
-            totalMatches: 0,
-            wins: 0,
-            losses: 0,
-            ties: 0,
-            correctRate: 0,
-            totalXp: 0,
-        },
     },
     {
         name: 'GPT-4o-mini',
@@ -47,14 +32,6 @@ const BOT_USERS = [
         botModel: 'gpt-4o-mini',
         role: UserRole.user,
         image: '/gpt.png',
-        stats: {
-            totalMatches: 0,
-            wins: 0,
-            losses: 0,
-            ties: 0,
-            correctRate: 0,
-            totalXp: 0,
-        },
     },
 ];
 

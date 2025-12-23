@@ -7,13 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { ArrowLeft, Calendar, ChevronRight, Trophy, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { getUserMatchHistory, type MatchHistoryItem } from '@/actions/user.server'
-
-const languageInfo: Record<string, { flag: string; name: string }> = {
-    JP: { flag: '🇯🇵', name: '日文' },
-    EN: { flag: '🇺🇸', name: '英文' },
-    KR: { flag: '🇰🇷', name: '韓文' },
-    CN: { flag: '🇨🇳', name: '中文' },
-}
+import { getGameLanguage } from '@/lib/config/game'
 
 export default function HistoryPage() {
     const router = useRouter()
@@ -88,14 +82,14 @@ export default function HistoryPage() {
                             >
                                 {/* Language Flag */}
                                 <div className="w-12 h-12 rounded-xl bg-[#F0F7FF] flex items-center justify-center text-2xl border border-[#D5E3F7]">
-                                    {languageInfo[match.language]?.flag || '🌐'}
+                                    {getGameLanguage(match.language)?.flag || '🌐'}
                                 </div>
 
                                 {/* Match Info */}
                                 <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-1">
                                         <span className="font-bold text-[#333]">
-                                            {languageInfo[match.language]?.name || match.language}
+                                            {getGameLanguage(match.language)?.examName || match.language}
                                         </span>
                                         <span className="text-xs px-2 py-0.5 bg-[#E2E8F0] rounded-full text-[#475569] font-medium">
                                             Lv. {match.rank}

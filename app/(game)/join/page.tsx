@@ -9,6 +9,7 @@ import { ArrowLeft, Users, RefreshCw, Clock } from 'lucide-react'
 import { getWaitingMatches, joinWaitingMatch, type WaitingMatchInfo } from '@/actions/game.server'
 import { rankToLevel } from '@/lib/config/game'
 import type { TargetLanguage } from '@/generated/prisma'
+import { getGameLanguage } from '@/lib/config/game'
 
 const languageFlags: Record<TargetLanguage, string> = {
     JP: '🇯🇵',
@@ -155,7 +156,7 @@ export default function JoinPage() {
                                         </span>
                                         <div>
                                             <p className="font-bold text-[#333]">
-                                                {languageNames[match.targetLanguage]} {rankToLevel(match.targetLanguage, match.rank)}
+                                                {getGameLanguage(match.targetLanguage)?.examName} {rankToLevel(match.targetLanguage, match.rank)}
                                             </p>
                                             <p className="text-sm text-[#64748b]">
                                                 {match.questionCount}題 · 房主: {match.hostName}

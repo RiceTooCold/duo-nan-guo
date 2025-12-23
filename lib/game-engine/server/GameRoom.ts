@@ -20,12 +20,71 @@ import {
 } from './GameStore';
 import { getBotAnswer } from '@/actions/bot.server';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/binary';
+import { calculateScore } from '@/lib/config/game';
 
 const TIME_PER_QUESTION = 15; // seconds
 const RESOLVING_DURATION = 3000; // ms
 
 // Simple in-memory lock to prevent duplicate bot triggers
 const botProcessingLocks = new Set<string>();
+
+/**
+ * MatchMutex - Ensures sequential processing of answer submissions per match
+ * 
+ * Why: When player and bot submit answers within milliseconds, both Prisma transactions
+ * read the same liveState and try to write simultaneously, causing P2034 conflicts.
+ * Database-level retry is insufficient when operations collide repeatedly.
+ * 
+ * Solution: Serialize all write operations per match using an async mutex.
+ * Later submissions wait for earlier ones to complete before acquiring the lock.
+ */
+class MatchMutex {
+    private locks = new Map<string, Promise<void>>();
+
+    /**
+     * Execute a function with exclusive access to a match
+     * @param matchId - The match to lock
+     * @param fn - The async function to execute while holding the lock
+     * @returns The result of fn()
+     */
+    async withLock<T>(matchId: string, fn: () => Promise<T>): Promise<T> {
+        // Wait for any existing operation on this match to complete
+        const existingLock = this.locks.get(matchId);
+
+        // Create a new promise for this operation
+        let releaseLock: () => void;
+        const newLock = new Promise<void>((resolve) => {
+            releaseLock = resolve;
+        });
+
+        // Set our lock as the current one (others will wait for this)
+        this.locks.set(matchId, newLock);
+
+        try {
+            // Wait for previous operation if any
+            if (existingLock) {
+                console.log(`🔒 [Mutex] Waiting for lock on match ${matchId.slice(-4)}`);
+                await existingLock;
+            }
+            console.log(`🔓 [Mutex] Acquired lock for match ${matchId.slice(-4)}`);
+
+            // Execute the protected operation
+            return await fn();
+        } finally {
+            // Release the lock
+            console.log(`🔓 [Mutex] Released lock for match ${matchId.slice(-4)}`);
+            releaseLock!();
+
+            // Clean up if no one else is waiting
+            if (this.locks.get(matchId) === newLock) {
+                this.locks.delete(matchId);
+            }
+        }
+    }
+}
+
+// Global mutex instance for answer submissions
+const matchMutex = new MatchMutex();
 
 /**
  * Initialize a game room from a match
@@ -145,161 +204,167 @@ export async function submitAnswer(
     playerId: string,
     answer: string
 ): Promise<LiveGameState> {
-    // Use transaction to ensure atomic read-modify-write
-    // MongoDB transactions may face write conflicts. Retry up to 3 times.
-    let attempt = 0;
-    while (attempt < 3) {
-        try {
-            return await prisma.$transaction(async (tx) => {
-                // 1. Read current state within transaction
-                const match = await tx.match.findUnique({
-                    where: { id: matchId },
-                    select: {
-                        liveState: true,
-                        questionIds: true,
-                        players: true,
-                    },
-                });
+    // Use mutex to serialize answer submissions per match
+    // This prevents P2034 conflicts when player and bot submit simultaneously
+    return matchMutex.withLock(matchId, async () => {
+        // Use transaction to ensure atomic read-modify-write
+        // MongoDB transactions may face write conflicts. Retry up to 3 times.
+        let attempt = 0;
+        while (attempt < 3) {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    // 1. Read current state within transaction
+                    const match = await tx.match.findUnique({
+                        where: { id: matchId },
+                        select: {
+                            liveState: true,
+                            questionIds: true,
+                            players: true,
+                            timePerQuestion: true,
+                        },
+                    });
 
-                if (!match?.liveState) throw new Error('Game not found');
-                const state = match.liveState as unknown as LiveGameState;
+                    if (!match?.liveState) throw new Error('Game not found');
+                    const state = match.liveState as unknown as LiveGameState;
 
-                // 2. Validate game state
-                if (state.phase !== GamePhase.PLAYING) {
-                    throw new Error('Not in playing phase');
-                }
+                    // 2. Validate game state
+                    if (state.phase !== GamePhase.PLAYING) {
+                        throw new Error('Not in playing phase');
+                    }
 
-                if (Date.now() > state.endTime) {
-                    // Time is up - return current state instead of error
-                    // The timeout handler will mark unanswered players
-                    console.log(`⏱️ [submitAnswer] Time expired for ${playerId}, ignoring late answer`);
-                    return state;
-                }
+                    if (Date.now() > state.endTime) {
+                        // Time is up - return current state instead of error
+                        // The timeout handler will mark unanswered players
+                        console.log(`⏱️ [submitAnswer] Time expired for ${playerId}, ignoring late answer`);
+                        return state;
+                    }
 
-                const playerState = state.playerStates[playerId];
-                if (!playerState) {
-                    throw new Error(`Player ${playerId} not found in game`);
-                }
+                    const playerState = state.playerStates[playerId];
+                    if (!playerState) {
+                        throw new Error(`Player ${playerId} not found in game`);
+                    }
 
-                if (playerState.answer !== null) {
-                    throw new Error('Already answered');
-                }
+                    if (playerState.answer !== null) {
+                        throw new Error('Already answered');
+                    }
 
-                // 3. Get correct answer
-                const questionId = match.questionIds[state.currentQuestionIndex];
-                const question = await tx.question.findUnique({
-                    where: { id: questionId },
-                    select: { correctAnswer: true },
-                });
-                if (!question) throw new Error('Question not found');
+                    // 3. Get correct answer
+                    const questionId = match.questionIds[state.currentQuestionIndex];
+                    const question = await tx.question.findUnique({
+                        where: { id: questionId },
+                        select: { correctAnswer: true },
+                    });
+                    if (!question) throw new Error('Question not found');
 
-                const isCorrect = answer === question.correctAnswer;
-                const scoreChange = isCorrect ? 10 : 0;
+                    const isCorrect = answer === question.correctAnswer;
 
-                // Log answer submission with player name
-                const player = match.players.find(p => p.playerId === playerId);
-                const playerName = player?.name || playerId;
-                console.log(`📝 [Answer] ${playerName} (${isCorrect ? '✅' : '❌'}): ${answer}`);
-
-                // 4. Update player state
-                const newStreak = isCorrect ? playerState.streak + 1 : 0;
-                const updatedPlayerState: PlayerGameState = {
-                    score: playerState.score + scoreChange,
-                    streak: newStreak,
-                    maxStreak: Math.max(playerState.maxStreak, newStreak),
-                    answer,
-                    isCorrect,
-                };
-
-                const newPlayerStates = {
-                    ...state.playerStates,
-                    [playerId]: updatedPlayerState,
-                };
-
-                // Check if all players answered
-                const allAnswered = Object.values(newPlayerStates).every(ps => ps.answer !== null);
-
-                let newState: LiveGameState = {
-                    ...state,
-                    playerStates: newPlayerStates,
-                };
-
-                if (allAnswered) {
-                    newState = {
-                        ...newState,
-                        phase: GamePhase.RESOLVING,
-                        correctAnswer: question.correctAnswer,
-                    };
-                }
-
-                // 5a. Save state atomically within transaction
-                await tx.match.update({
-                    where: { id: matchId },
-                    data: { liveState: newState as unknown as object },
-                });
-
-                // 5b. Write AnswerRecord if player exists
-                if (player) {
-                    // Calculate response time: roughly (endTime - timePerQuestion*1000) vs now?
-                    // Or simpler: (endTime - now). But endTime is when round ends.
-                    // Better approximation: Game started at (endTime - 10000). So response time = 10000 - (endTime - now)
-                    // Assuming 10s per question.
-                    const timePerQuestionMs = 10000;
+                    // Calculate response time using actual match timePerQuestion
+                    const timePerQuestionMs = (match.timePerQuestion || 15) * 1000;
                     const timeLeftMs = Math.max(0, state.endTime - Date.now());
                     const responseTimeMs = Math.max(0, timePerQuestionMs - timeLeftMs);
 
-                    await tx.answerRecord.create({
-                        data: {
-                            matchId,
-                            questionId,
-                            userId: player.userId || null, // null for rule bots
-                            answer,
-                            isCorrect,
-                            responseTimeMs,
-                        }
+                    // Calculate score using advanced scoring (speed bonus + combo)
+                    const scoreChange = calculateScore(isCorrect, responseTimeMs, playerState.streak);
+
+                    // Log answer submission with player name
+                    const player = match.players.find(p => p.playerId === playerId);
+                    const playerName = player?.name || playerId;
+                    console.log(`📝 [Answer] ${playerName} (${isCorrect ? '✅' : '❌'}): ${answer}, responseTime=${responseTimeMs}ms, streak=${playerState.streak}, score=+${scoreChange}`);
+
+                    // 4. Update player state
+                    const newStreak = isCorrect ? playerState.streak + 1 : 0;
+                    const updatedPlayerState: PlayerGameState = {
+                        score: playerState.score + scoreChange,
+                        streak: newStreak,
+                        maxStreak: Math.max(playerState.maxStreak, newStreak),
+                        answer,
+                        isCorrect,
+                        lastScoreChange: scoreChange,
+                    };
+
+                    const newPlayerStates = {
+                        ...state.playerStates,
+                        [playerId]: updatedPlayerState,
+                    };
+
+                    // Check if all players answered
+                    const allAnswered = Object.values(newPlayerStates).every(ps => ps.answer !== null);
+
+                    let newState: LiveGameState = {
+                        ...state,
+                        playerStates: newPlayerStates,
+                    };
+
+                    if (allAnswered) {
+                        newState = {
+                            ...newState,
+                            phase: GamePhase.RESOLVING,
+                            correctAnswer: question.correctAnswer,
+                        };
+                    }
+
+                    // 5a. Save state atomically within transaction
+                    await tx.match.update({
+                        where: { id: matchId },
+                        data: { liveState: newState as unknown as object },
                     });
+
+                    // 5b. Write AnswerRecord if player exists
+                    if (player) {
+                        await tx.answerRecord.create({
+                            data: {
+                                matchId,
+                                questionId,
+                                userId: player.userId || null, // null for rule bots
+                                answer,
+                                isCorrect,
+                                responseTimeMs,
+                            }
+                        });
+                    }
+
+                    // 6. Broadcast and schedule (outside transaction is fine)
+                    await broadcastState(matchId, newState);
+
+                    // Simple state logging
+                    const logState = {
+                        phase: newState.phase,
+                        qIndex: newState.currentQuestionIndex,
+                        scores: Object.fromEntries(
+                            Object.entries(newState.playerStates).map(([pid, ps]) => [
+                                // map playerId to simplified string "PlayerName:Score" if possible, otherwise just score
+                                match.players.find(p => p.playerId === pid)?.name || pid,
+                                ps.score
+                            ])
+                        )
+                    };
+                    console.log(`📡 [State] Match ${matchId.slice(-4)}:`, JSON.stringify(logState));
+
+                    if (allAnswered) {
+                        scheduleNextAction(matchId, match.questionIds.length);
+                    }
+
+                    return newState;
+                });
+            } catch (error: unknown) {
+                attempt++;
+                const isConflict = error instanceof PrismaClientKnownRequestError &&
+                    (error.code === 'P2002' || // Unique constraint
+                        error.code === 'P2034' || // Transaction write conflict/deadlock (MongoDB)
+                        error.message?.includes('WriteConflict') ||
+                        error.message?.includes('conflict') ||
+                        error.message?.includes('deadlock'));
+
+                if (isConflict && attempt < 3) {
+                    console.warn(`🔄 [submitAnswer] Retry attempt ${attempt} due to conflict`);
+                    await new Promise(r => setTimeout(r, Math.random() * 100)); // Backoff
+                    continue;
                 }
-
-                // 6. Broadcast and schedule (outside transaction is fine)
-                await broadcastState(matchId, newState);
-
-                // Simple state logging
-                const logState = {
-                    phase: newState.phase,
-                    qIndex: newState.currentQuestionIndex,
-                    scores: Object.fromEntries(
-                        Object.entries(newState.playerStates).map(([pid, ps]) => [
-                            // map playerId to simplified string "PlayerName:Score" if possible, otherwise just score
-                            match.players.find(p => p.playerId === pid)?.name || pid,
-                            ps.score
-                        ])
-                    )
-                };
-                console.log(`📡 [State] Match ${matchId.slice(-4)}:`, JSON.stringify(logState));
-
-                if (allAnswered) {
-                    scheduleNextAction(matchId, match.questionIds.length);
-                }
-
-                return newState;
-            });
-        } catch (error: unknown) {
-            attempt++;
-            const isConflict = error instanceof PrismaClientKnownRequestError &&
-                (error.code === 'P2002' || // WriteConflict
-                    error.message?.includes('WriteConflict') ||
-                    error.message?.includes('conflict') ||
-                    error.message?.includes('deadlock'));
-
-            if (isConflict && attempt < 3) {
-                console.warn(`🔄 [submitAnswer] Retry attempt ${attempt} due to conflict`);
-                await new Promise(r => setTimeout(r, Math.random() * 100)); // Backoff
-                continue;
+                throw error;
             }
-            throw error;
         }
-    }
-    throw new Error('Max retries reached');
+        throw new Error('Max retries reached');
+    });
 }
 
 /**
@@ -307,90 +372,115 @@ export async function submitAnswer(
  * Uses transaction with retry logic for concurrency safety
  */
 export async function handleTimeout(matchId: string): Promise<LiveGameState> {
-    let attempt = 0;
-    while (attempt < 3) {
-        try {
-            return await prisma.$transaction(async (tx) => {
-                // 1. Read current state within transaction
-                const match = await tx.match.findUnique({
-                    where: { id: matchId },
-                    select: {
-                        liveState: true,
-                        questionIds: true,
-                    },
-                });
+    // Use mutex to serialize with answer submissions
+    // Prevents race between late answers and timeout handling
+    return matchMutex.withLock(matchId, async () => {
+        let attempt = 0;
+        while (attempt < 3) {
+            try {
+                return await prisma.$transaction(async (tx) => {
+                    // 1. Read current state within transaction
+                    const match = await tx.match.findUnique({
+                        where: { id: matchId },
+                        select: {
+                            liveState: true,
+                            questionIds: true,
+                            players: true,  // Need players to create AnswerRecords
+                        },
+                    });
 
-                if (!match?.liveState) throw new Error('Game not found');
-                const state = match.liveState as unknown as LiveGameState;
+                    if (!match?.liveState) throw new Error('Game not found');
+                    const state = match.liveState as unknown as LiveGameState;
 
-                if (state.phase !== GamePhase.PLAYING) {
-                    return state; // Already handled
-                }
-
-                // Validate that time is actually up (allow 1s buffer for clock skew)
-                if (Date.now() < state.endTime - 1000) {
-                    console.warn(`⚠️ [handleTimeout] Rejected premature timeout. EndTime: ${state.endTime}, Now: ${Date.now()}`);
-                    return state;
-                }
-
-                // 2. Get correct answer
-                const questionId = match.questionIds[state.currentQuestionIndex];
-                const question = await tx.question.findUnique({
-                    where: { id: questionId },
-                    select: { correctAnswer: true },
-                });
-
-                // 3. Mark unanswered players as wrong
-                const newPlayerStates: { [playerId: string]: PlayerGameState } = {};
-                for (const [playerId, playerState] of Object.entries(state.playerStates)) {
-                    if (playerState.answer === null) {
-                        newPlayerStates[playerId] = {
-                            ...playerState,
-                            answer: '',
-                            isCorrect: false,
-                            streak: 0,
-                        };
-                    } else {
-                        newPlayerStates[playerId] = playerState;
+                    if (state.phase !== GamePhase.PLAYING) {
+                        return state; // Already handled
                     }
-                }
 
-                const newState: LiveGameState = {
-                    ...state,
-                    phase: GamePhase.RESOLVING,
-                    playerStates: newPlayerStates,
-                    correctAnswer: question?.correctAnswer || null,
-                };
+                    // Validate that time is actually up (allow 1s buffer for clock skew)
+                    if (Date.now() < state.endTime - 1000) {
+                        console.warn(`⚠️ [handleTimeout] Rejected premature timeout. EndTime: ${state.endTime}, Now: ${Date.now()}`);
+                        return state;
+                    }
 
-                // 4. Save state atomically within transaction
-                await tx.match.update({
-                    where: { id: matchId },
-                    data: { liveState: newState as unknown as object },
+                    // 2. Get correct answer
+                    const questionId = match.questionIds[state.currentQuestionIndex];
+                    const question = await tx.question.findUnique({
+                        where: { id: questionId },
+                        select: { correctAnswer: true },
+                    });
+
+                    // 3. Mark unanswered players as wrong + create AnswerRecords for timeout
+                    const newPlayerStates: { [playerId: string]: PlayerGameState } = {};
+                    for (const [playerId, playerState] of Object.entries(state.playerStates)) {
+                        if (playerState.answer === null) {
+                            // Find the player to get userId
+                            const player = match.players.find(p => p.playerId === playerId);
+
+                            // Create AnswerRecord for timeout (answer: '', responseTimeMs: 0)
+                            if (player?.userId) {
+                                await tx.answerRecord.create({
+                                    data: {
+                                        matchId,
+                                        questionId,
+                                        userId: player.userId,
+                                        answer: '',        // Empty = timeout
+                                        isCorrect: false,
+                                        responseTimeMs: 0, // 0 = no actual response
+                                    }
+                                });
+                                console.log(`⏰ [Timeout] Created AnswerRecord for ${player.name} (timeout)`);
+                            }
+
+                            newPlayerStates[playerId] = {
+                                ...playerState,
+                                answer: '',
+                                isCorrect: false,
+                                streak: 0,
+                                lastScoreChange: 0,
+                            };
+                        } else {
+                            newPlayerStates[playerId] = playerState;
+                        }
+                    }
+
+                    const newState: LiveGameState = {
+                        ...state,
+                        phase: GamePhase.RESOLVING,
+                        playerStates: newPlayerStates,
+                        correctAnswer: question?.correctAnswer || null,
+                    };
+
+                    // 4. Save state atomically within transaction
+                    await tx.match.update({
+                        where: { id: matchId },
+                        data: { liveState: newState as unknown as object },
+                    });
+
+                    // 5. Broadcast and schedule next action
+                    await broadcastState(matchId, newState);
+                    scheduleNextAction(matchId, match.questionIds.length);
+
+                    return newState;
                 });
+            } catch (error: unknown) {
+                attempt++;
+                const isConflict = error instanceof PrismaClientKnownRequestError &&
+                    (error.code === 'P2002' || // Unique constraint
+                        error.code === 'P2034' || // Transaction write conflict/deadlock (MongoDB)
+                        error.message?.includes('WriteConflict') ||
+                        error.message?.includes('conflict') ||
+                        error.message?.includes('deadlock'));
 
-                // 5. Broadcast and schedule next action
-                await broadcastState(matchId, newState);
-                scheduleNextAction(matchId, match.questionIds.length);
-
-                return newState;
-            });
-        } catch (error: unknown) {
-            attempt++;
-            const isConflict = error instanceof PrismaClientKnownRequestError &&
-                (error.code === 'P2002' ||
-                    error.message?.includes('WriteConflict') ||
-                    error.message?.includes('conflict') ||
-                    error.message?.includes('deadlock'));
-
-            if (isConflict && attempt < 3) {
-                console.warn(`🔄 [handleTimeout] Retry attempt ${attempt} due to conflict`);
-                await new Promise(r => setTimeout(r, Math.random() * 100)); // Backoff
-                continue;
+                if (isConflict && attempt < 3) {
+                    console.warn(`🔄 [handleTimeout] Retry attempt ${attempt} due to conflict`);
+                    await new Promise(r => setTimeout(r, Math.random() * 100)); // Backoff
+                    continue;
+                }
+                throw error;
             }
-            throw error;
         }
-    }
-    throw new Error('Max retries reached');
+        throw new Error('Max retries reached');
+    });
 }
 
 /**
@@ -527,55 +617,8 @@ async function finishGame(matchId: string): Promise<void> {
         },
     });
 
-    // --- Update UserStats for logged-in players ---
-    const realPlayers = updatedPlayers.filter(p => !p.isBot && p.userId);
-
-    for (const player of realPlayers) {
-        if (!player.userId) continue;
-
-        const isWin = winnerPlayerId === player.playerId;
-        const isLoss = !isWin && !isTie;
-
-        // Calculate XP
-        let xpGained = 0;
-        if (isWin) xpGained = 100;
-        else if (isTie) xpGained = 50;
-        else if (isLoss) xpGained = 20;
-
-        // Fetch current user stats
-        const currentUser = await prisma.user.findUnique({
-            where: { id: player.userId },
-            select: { stats: true }
-        });
-
-        const currentStats = currentUser?.stats || {
-            totalMatches: 0,
-            wins: 0,
-            losses: 0,
-            ties: 0,
-            correctRate: 0,
-            totalXp: 0
-        };
-
-        // Update User Stats
-        await prisma.user.update({
-            where: { id: player.userId },
-            data: {
-                stats: {
-                    set: {
-                        totalMatches: currentStats.totalMatches + 1,
-                        wins: currentStats.wins + (isWin ? 1 : 0),
-                        losses: currentStats.losses + (isLoss ? 1 : 0),
-                        ties: currentStats.ties + (isTie ? 1 : 0),
-                        correctRate: currentStats.correctRate, // TODO: Update with actual rate
-                        totalXp: currentStats.totalXp + xpGained
-                    }
-                }
-            }
-        });
-
-        console.log(`✅ [finishGame] Updated stats for user ${player.userId}: +${xpGained}XP`);
-    }
+    // Note: User stats are now calculated on-the-fly from Match/AnswerRecord
+    // See: actions/user.server.ts -> getUserDashboardStats()
 
     console.log(`✅ [finishGame] Match ${matchId} successfully finished`);
 }

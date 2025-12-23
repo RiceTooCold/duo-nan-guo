@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
-import { ArrowLeft, CheckCircle, XCircle, Trophy, Target, Minus } from 'lucide-react'
+import { ArrowLeft, CheckCircle, XCircle, Trophy, Target, Minus, Clock } from 'lucide-react'
 import { getMatchDetail, type MatchDetail } from '@/actions/user.server'
 
 const languageInfo: Record<string, { flag: string; name: string }> = {
@@ -145,65 +145,75 @@ export default function HistoryDetailPage() {
                         <Target className="w-4 h-4" /> 答題記錄
                     </h3>
 
-                    {detail.questions.map((q, index) => (
-                        <motion.div
-                            key={q.id}
-                            className={`bg-white rounded-2xl border-2 p-4 ${q.isCorrect ? 'border-[#22c55e]/30' : 'border-[#ef4444]/30'}`}
-                            initial={{ opacity: 0, x: -20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            transition={{ delay: index * 0.05 }}
-                        >
-                            {/* Question Header */}
-                            <div className="flex items-start gap-3 mb-3">
-                                <div className={`mt-0.5 ${q.isCorrect ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
-                                    {q.isCorrect ? (
-                                        <CheckCircle className="w-5 h-5" />
-                                    ) : (
-                                        <XCircle className="w-5 h-5" />
-                                    )}
+                    {detail.questions.map((q, index) => {
+                        // Timeout: either null (no record) or '' (explicit timeout)
+                        const isTimeout = !q.playerAnswer || q.playerAnswer === '';
+
+                        return (
+                            <motion.div
+                                key={q.id}
+                                className={`bg-white rounded-2xl border-2 p-4 ${isTimeout ? 'border-amber-400/50' : q.isCorrect ? 'border-[#22c55e]/30' : 'border-[#ef4444]/30'}`}
+                                initial={{ opacity: 0, x: -20 }}
+                                animate={{ opacity: 1, x: 0 }}
+                                transition={{ delay: index * 0.05 }}
+                            >
+                                {/* Question Header */}
+                                <div className="flex items-start gap-3 mb-3">
+                                    <div className={`mt-0.5 ${isTimeout ? 'text-amber-500' : q.isCorrect ? 'text-[#22c55e]' : 'text-[#ef4444]'}`}>
+                                        {isTimeout ? (
+                                            <Clock className="w-5 h-5" />
+                                        ) : q.isCorrect ? (
+                                            <CheckCircle className="w-5 h-5" />
+                                        ) : (
+                                            <XCircle className="w-5 h-5" />
+                                        )}
+                                    </div>
+                                    <p className="text-sm font-medium text-[#333] flex-1">
+                                        <span className="text-[#5B8BD4] font-bold">Q{index + 1}.</span> {q.stimulus}
+                                        {isTimeout && (
+                                            <span className="ml-2 text-xs font-medium text-amber-500 bg-amber-50 px-2 py-0.5 rounded-full">超時</span>
+                                        )}
+                                    </p>
                                 </div>
-                                <p className="text-sm font-medium text-[#333] flex-1">
-                                    <span className="text-[#5B8BD4] font-bold">Q{index + 1}.</span> {q.stimulus}
-                                </p>
-                            </div>
 
-                            {/* Options Grid */}
-                            <div className="grid grid-cols-2 gap-2 ml-8">
-                                {Object.entries(q.options).map(([key, value]) => {
-                                    const isPlayerAnswer = q.playerAnswer === key
-                                    const isCorrectAnswer = q.correctAnswer === key
+                                {/* Options Grid */}
+                                <div className="grid grid-cols-2 gap-2 ml-8">
+                                    {Object.entries(q.options).map(([key, value]) => {
+                                        const isPlayerAnswer = q.playerAnswer === key
+                                        const isCorrectAnswer = q.correctAnswer === key
 
-                                    let optionClass = 'bg-[#F5F8FC] border-[#D5E3F7] text-[#333]'
-                                    let indicator = null
+                                        let optionClass = 'bg-[#F5F8FC] border-[#D5E3F7] text-[#333]'
+                                        let indicator = null
 
-                                    if (isCorrectAnswer && isPlayerAnswer) {
-                                        // Correct answer that player selected
-                                        optionClass = 'bg-[#dcfce7] border-[#22c55e] text-[#22c55e]'
-                                        indicator = <CheckCircle className="w-4 h-4 text-[#22c55e]" />
-                                    } else if (isCorrectAnswer) {
-                                        // Correct answer that player didn't select
-                                        optionClass = 'bg-[#dcfce7] border-[#22c55e] text-[#22c55e]'
-                                        indicator = <span className="text-xs font-bold">正解</span>
-                                    } else if (isPlayerAnswer) {
-                                        // Wrong answer that player selected
-                                        optionClass = 'bg-[#fee2e2] border-[#ef4444] text-[#ef4444]'
-                                        indicator = <XCircle className="w-4 h-4 text-[#ef4444]" />
-                                    }
+                                        if (isCorrectAnswer && isPlayerAnswer) {
+                                            // Correct answer that player selected
+                                            optionClass = 'bg-[#dcfce7] border-[#22c55e] text-[#22c55e]'
+                                            indicator = <CheckCircle className="w-4 h-4 text-[#22c55e]" />
+                                        } else if (isCorrectAnswer) {
+                                            // Correct answer that player didn't select
+                                            optionClass = 'bg-[#dcfce7] border-[#22c55e] text-[#22c55e]'
+                                            indicator = <span className="text-xs font-bold">正解</span>
+                                        } else if (isPlayerAnswer) {
+                                            // Wrong answer that player selected
+                                            optionClass = 'bg-[#fee2e2] border-[#ef4444] text-[#ef4444]'
+                                            indicator = <XCircle className="w-4 h-4 text-[#ef4444]" />
+                                        }
 
-                                    return (
-                                        <div
-                                            key={key}
-                                            className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm ${optionClass}`}
-                                        >
-                                            <span className="font-bold uppercase w-5">{key}.</span>
-                                            <span className="flex-1">{value}</span>
-                                            {indicator}
-                                        </div>
-                                    )
-                                })}
-                            </div>
-                        </motion.div>
-                    ))}
+                                        return (
+                                            <div
+                                                key={key}
+                                                className={`flex items-center gap-2 px-3 py-2 rounded-xl border-2 text-sm ${optionClass}`}
+                                            >
+                                                <span className="font-bold uppercase w-5">{key}.</span>
+                                                <span className="flex-1">{value}</span>
+                                                {indicator}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </motion.div>
+                        )
+                    })}
                 </div>
             </div>
         </div>
