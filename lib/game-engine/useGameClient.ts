@@ -284,25 +284,29 @@ export function useGameClient(matchId: string): UseGameClientReturn {
         const currentQ = session.questions[liveState.currentQuestionIndex];
         if (!currentQ) return;
 
-        // 1. Instant verification using hash (0ms delay!)
+        // 1. Calculate response time locally (immune to network latency)
+        const responseTimeMs = liveState.endTime - Date.now();
+        const actualResponseTime = Math.max(0, 15000 - responseTimeMs); // 15s - remaining time
+
+        // 2. Instant verification using hash (0ms delay!)
         const answerHash = hashAnswer(answer);
         const correctHash = session.correctAnswerHashes[currentQ.id];
         const isCorrect = answerHash === correctHash;
 
-        // 2. Optimistic update for instant UI feedback
+        // 3. Optimistic update for instant UI feedback
         setOptimisticAnswer({
             answer,
             isCorrect,
             questionIndex: liveState.currentQuestionIndex,
         });
 
-        console.log(`⚡ [Instant] Answer ${answer} is ${isCorrect ? 'correct ✓' : 'wrong ✗'}`);
+        console.log(`⚡ [Instant] Answer ${answer} is ${isCorrect ? 'correct ✓' : 'wrong ✗'}, responseTime=${actualResponseTime}ms`);
 
-        // 3. Submit to server in background (for scoring)
-        submitServerAnswer(matchId, selfPlayerId, answer).catch(err => {
+        // 4. Submit to server in background (with client-calculated response time)
+        submitServerAnswer(matchId, selfPlayerId, answer, actualResponseTime).catch(err => {
             console.error('Submit answer error:', err);
         });
-    }, [matchId, selfPlayerId, liveState?.phase, liveState?.currentQuestionIndex, session]);
+    }, [matchId, selfPlayerId, liveState?.phase, liveState?.currentQuestionIndex, liveState?.endTime, session]);
 
     // NEW: Client-driven bot triggering
     const opponentState = liveState?.playerStates[opponentPlayerId || ''];

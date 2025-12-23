@@ -285,14 +285,16 @@ export async function initAndStartGameRoom(matchId: string) {
 
 /**
  * Submit an answer (server validates and scores)
+ * @param responseTimeMs - Optional response time from client (ms)
  */
 export async function submitServerAnswer(
     matchId: string,
     playerId: string,
-    answer: string
+    answer: string,
+    responseTimeMs?: number
 ) {
     try {
-        const state = await submitGameRoomAnswer(matchId, playerId, answer);
+        const state = await submitGameRoomAnswer(matchId, playerId, answer, responseTimeMs);
         return { success: true, state };
     } catch (error) {
         console.error('submitServerAnswer error:', error);

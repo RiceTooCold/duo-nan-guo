@@ -22,7 +22,7 @@ import { getBotAnswer } from '@/actions/bot.server';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/binary';
 import { calculateScore } from '@/lib/config/game';
 
-const TIME_PER_QUESTION = 20; // seconds
+const TIME_PER_QUESTION = 15; // seconds
 const RESOLVING_DURATION = 2000; // ms - time to show correct answer
 
 // Simple in-memory lock to prevent duplicate bot triggers
@@ -195,11 +195,13 @@ export async function startRound(matchId: string): Promise<LiveGameState> {
 
 /**
  * Submit an answer for a player (with transaction for concurrency safety)
+ * @param clientResponseTimeMs - Optional response time from client (ms). Validated and used if provided.
  */
 export async function submitAnswer(
     matchId: string,
     playerId: string,
-    answer: string
+    answer: string,
+    clientResponseTimeMs?: number
 ): Promise<LiveGameState> {
     // Use mutex to serialize answer submissions per match
     // This prevents P2034 conflicts when player and bot submit simultaneously
@@ -255,10 +257,21 @@ export async function submitAnswer(
 
                     const isCorrect = answer === question.correctAnswer;
 
-                    // Calculate response time using actual match timePerQuestion
-                    const timePerQuestionMs = (match.timePerQuestion || 15) * 1000;
-                    const timeLeftMs = Math.max(0, state.endTime - Date.now());
-                    const responseTimeMs = Math.max(0, timePerQuestionMs - timeLeftMs);
+                    // Calculate response time
+                    // Use client-provided time if available, with validation bounds
+                    const timePerQuestionMs = (match.timePerQuestion || 20) * 1000;
+                    const MIN_RESPONSE_TIME = 300;  // Human reaction minimum
+                    const MAX_RESPONSE_TIME = timePerQuestionMs + 1000; // Allow 1s buffer
+
+                    let responseTimeMs: number;
+                    if (clientResponseTimeMs !== undefined) {
+                        // Use client time with bounds validation
+                        responseTimeMs = Math.max(MIN_RESPONSE_TIME, Math.min(clientResponseTimeMs, MAX_RESPONSE_TIME));
+                    } else {
+                        // Fallback to server calculation (for bots or legacy clients)
+                        const timeLeftMs = Math.max(0, state.endTime - Date.now());
+                        responseTimeMs = Math.max(0, timePerQuestionMs - timeLeftMs);
+                    }
 
                     // Calculate score using advanced scoring (speed bonus + combo)
                     const scoreChange = calculateScore(isCorrect, responseTimeMs, playerState.streak);

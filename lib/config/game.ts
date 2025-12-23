@@ -100,7 +100,7 @@ export const SCORING_CONFIG = {
     comboMultipliers: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5] as const,
 
     /** Time per question in milliseconds */
-    timePerQuestionMs: 20000,
+    timePerQuestionMs: 15000,
 } as const
 
 /**
