@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ArrowLeft, Search, Filter, ChevronLeft, ChevronRight, Trash2, Edit, Eye, CheckCircle, AlertCircle } from 'lucide-react'
-import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType } from '@prisma/client'
 
 interface QuestionData {
     id: string

@@ -1,4 +1,4 @@
-import { ExamQuestionType } from '@/generated/prisma'
+import { ExamQuestionType } from '@prisma/client'
 import { getToeicPrompt } from './toeic'
 import { getJlptPrompt } from './jlpt'
 import { getTopikPrompt } from './topik'

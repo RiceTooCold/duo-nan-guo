@@ -1,4 +1,4 @@
-import { ExamQuestionType } from '@/generated/prisma'
+import { ExamQuestionType } from '@prisma/client'
 import { PromptConfig } from './index'
 
 // ─────────────────────────────────────────────────────────────────────────────

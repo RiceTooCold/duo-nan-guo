@@ -8,7 +8,7 @@
  */
 
 import { prisma } from '@/lib/prisma';
-import { MatchStatus } from '@/generated/prisma';
+import { MatchStatus } from '@prisma/client';
 import { GamePhase } from '@/types/game';
 import { pusherServer, getMatchChannel, PUSHER_EVENTS } from '@/lib/pusher';
 import {

@@ -8,7 +8,7 @@
  * - questionTypesByRank: single source of truth for availability + percentages
  */
 
-import { ExamQuestionType, TargetLanguage } from '@/generated/prisma'
+import { ExamQuestionType, TargetLanguage } from '@prisma/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { TargetLanguage } from '@/generated/prisma'
+import { TargetLanguage } from '@prisma/client'
 import { getBankStats } from '@/lib/factory'
 
 export async function GET(

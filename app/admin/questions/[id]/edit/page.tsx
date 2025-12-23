@@ -19,7 +19,7 @@ interface QuestionData {
 
 // Use centralized config
 import { languageConfig, getQuestionTypeLabel, getRankLabel } from '@/lib/config/factory'
-import { TargetLanguage } from '@/generated/prisma'
+import { TargetLanguage } from '@prisma/client'
 
 export default function EditQuestionPage() {
     const router = useRouter()

@@ -17,7 +17,7 @@ import {
 } from '@/actions/game.server'
 import { getPusherClient, getRoomChannel, ROOM_EVENTS } from '@/lib/pusher'
 import { rankToLevel } from '@/lib/config/game'
-import type { MatchStatus, TargetLanguage } from '@/generated/prisma'
+import type { MatchStatus, TargetLanguage } from '@prisma/client'
 
 interface MatchPlayer {
     userId: string | null

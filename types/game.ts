@@ -1,4 +1,4 @@
-import type { TargetLanguage, MatchPlayer } from '@/generated/prisma';
+import type { TargetLanguage, MatchPlayer } from '@prisma/client';
 
 export enum GamePhase {
   IDLE = 'IDLE',

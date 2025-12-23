@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType } from '@prisma/client'
 import {
     generateSingleQuestion,
     generateBatchAndSample,

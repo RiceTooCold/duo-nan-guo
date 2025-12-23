@@ -10,9 +10,9 @@
     "db:generate": "PRISMA_GENERATE_SKIP_AUTOINSTALL=true prisma generate",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "seed-bots": "npx tsx prisma/seed-bots.ts"
+    "seed-bots": "npx tsx prisma/seed-bots.ts",
+    "postinstall": "prisma generate"
   },
-  "postinstall": "prisma generate",
   "dependencies": {
     "@ai-sdk/google": "^3.0.0",
     "@ai-sdk/openai": "^3.0.0",

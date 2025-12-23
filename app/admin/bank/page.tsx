@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Sparkles, PlusCircle, ChevronRight, Database, TrendingUp } from 'lucide-react'
-import { TargetLanguage } from '@/generated/prisma'
+import { TargetLanguage } from '@prisma/client'
 import { languageConfig } from '@/lib/config/factory'
 import { useEffect, useState } from 'react'
 

@@ -2,7 +2,7 @@
 
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { MatchStatus } from '@/generated/prisma';
+import { MatchStatus } from '@prisma/client';
 
 /**
  * Cron job to clean up stuck matches

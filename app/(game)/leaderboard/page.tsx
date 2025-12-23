@@ -7,7 +7,7 @@ import { Trophy, ChevronLeft, Crown, Bot, User, Zap, Target, Timer, Medal } from
 import { Avatar } from '@/components/game/Avatar'
 import { getLeaderboard, type LeaderboardEntry } from '@/actions/leaderboard.server'
 import { gameLanguages } from '@/lib/config/game'
-import type { TargetLanguage } from '@/generated/prisma'
+import type { TargetLanguage } from '@prisma/client'
 
 type FilterOption = 'all' | TargetLanguage
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { ArrowLeft, PlusCircle, ChevronLeft, ChevronRight, Trash2, Edit, Eye, CheckCircle, AlertCircle, BarChart3, Loader2, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react'
-import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType } from '@prisma/client'
 import { languageConfig, getQuestionTypeLabel } from '@/lib/config/factory'
 
 interface QuestionData {

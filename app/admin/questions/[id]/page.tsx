@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { ArrowLeft, Edit, CheckCircle, AlertCircle, Clock, Sparkles } from 'lucide-react'
 import { getQuestionById } from '@/lib/factory'
 import { languageConfig, getQuestionTypeLabel, getRankLabel } from '@/lib/config/factory'
-import { TargetLanguage } from '@/generated/prisma'
+import { TargetLanguage } from '@prisma/client'
 
 export default async function QuestionDetailPage({
     params,

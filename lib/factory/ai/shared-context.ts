@@ -5,7 +5,7 @@
  * Ensures all roles have consistent understanding of question context
  */
 
-import { ExamQuestionType, TargetLanguage } from '@/generated/prisma'
+import { ExamQuestionType, TargetLanguage } from '@prisma/client'
 import { languageConfig, getRankLabel } from '@/lib/config/factory'
 
 export interface SharedContext {

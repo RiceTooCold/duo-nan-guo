@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { MatchStatus, TargetLanguage } from '@/generated/prisma';
+import { MatchStatus, TargetLanguage } from '@prisma/client';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

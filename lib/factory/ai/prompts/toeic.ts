@@ -1,4 +1,4 @@
-import { ExamQuestionType } from '@/generated/prisma'
+import { ExamQuestionType } from '@prisma/client'
 import { PromptConfig } from './index'
 
 const baseSystemPrompt = `You are an expert TOEIC exam question writer specializing in Part 5 (Incomplete Sentences).

@@ -5,7 +5,7 @@
  * Derived from factory.ts but simplified for UI display purposes.
  */
 
-import type { TargetLanguage } from '@/generated/prisma'
+import type { TargetLanguage } from '@prisma/client'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types

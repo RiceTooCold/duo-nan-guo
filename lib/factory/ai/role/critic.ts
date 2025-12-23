@@ -1,6 +1,6 @@
 import { criticModel } from '@/lib/factory/ai/gemini'
 import { GeneratedQuestion } from '@/lib/factory/ai/role/generator'
-import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType } from '@prisma/client'
 import { rateLimiter } from '@/lib/factory/utils/rate-limiter'
 import { createSharedContext, formatContextForPrompt } from '@/lib/factory/ai/shared-context'
 

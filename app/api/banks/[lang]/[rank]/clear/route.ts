@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { TargetLanguage, ExamQuestionType, Prisma } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType, Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 
 export async function DELETE(

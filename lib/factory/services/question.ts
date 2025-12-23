@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma'
-import { Question, TargetLanguage, ExamQuestionType, Prisma } from '@/generated/prisma'
+import { Question, TargetLanguage, ExamQuestionType, Prisma } from '@prisma/client'
 import { GeneratedQuestion } from '@/lib/factory/ai/role/generator'
 import { CriticResult } from '@/lib/factory/ai/role/critic'
 

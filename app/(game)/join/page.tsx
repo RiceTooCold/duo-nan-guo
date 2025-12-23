@@ -8,7 +8,7 @@ import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, RefreshCw, Clock } from 'lucide-react'
 import { getWaitingMatches, joinWaitingMatch, type WaitingMatchInfo } from '@/actions/game.server'
 import { rankToLevel } from '@/lib/config/game'
-import type { TargetLanguage } from '@/generated/prisma'
+import type { TargetLanguage } from '@prisma/client'
 import { getGameLanguage } from '@/lib/config/game'
 
 const languageFlags: Record<TargetLanguage, string> = {

@@ -4,7 +4,7 @@ import { useState, Suspense, useCallback } from 'react'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Sparkles, ArrowLeft, Loader2, CheckCircle, XCircle, Clock, Zap, RefreshCw, Eye, X } from 'lucide-react'
-import { TargetLanguage, ExamQuestionType } from '@/generated/prisma'
+import { TargetLanguage, ExamQuestionType } from '@prisma/client'
 import { languageConfig, getQuestionTypesForRank, getQuestionTypeLabel } from '@/lib/config/factory'
 import { useGeneration, GenerationParams, QuestionProgress, QuestionStatus } from '@/contexts/GenerationContext'
 

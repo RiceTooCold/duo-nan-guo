@@ -11,7 +11,7 @@ import { BattleIntro } from '@/components/game/BattleIntro'
 import { useGameClient } from '@/lib/game-engine/useGameClient'
 import { GamePhase, type ClientQuestion } from '@/types/game'
 import { rankToLevel } from '@/lib/config/game'
-import { TargetLanguage } from '@/generated/prisma'
+import { TargetLanguage } from '@prisma/client'
 import { getLanguageConfig } from '@/lib/config/factory'
 
 

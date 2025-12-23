@@ -1,7 +1,7 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { TargetLanguage, MatchStatus } from '@/generated/prisma';
+import { TargetLanguage, MatchStatus } from '@prisma/client';
 
 /**
  * Match history item for list display

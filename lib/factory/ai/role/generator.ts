@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { ExamQuestionType, TargetLanguage } from '@/generated/prisma'
+import { ExamQuestionType, TargetLanguage } from '@prisma/client'
 import { generatorModel } from '@/lib/factory/ai/gemini'
 import { getPromptConfig, getRandomTopic } from '@/lib/factory/ai/prompts'
 import { rateLimiter } from '@/lib/factory/utils/rate-limiter'

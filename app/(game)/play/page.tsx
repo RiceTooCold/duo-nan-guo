@@ -8,7 +8,7 @@ import { useSession } from 'next-auth/react'
 import { ArrowLeft, Users, Bot, Check } from 'lucide-react'
 import { createWaitingMatch, getBotUsers, type BotUserInfo } from '@/actions/game.server'
 import { gameLanguages, questionCounts, levelToRank, type GameLanguageConfig } from '@/lib/config/game'
-import type { TargetLanguage } from '@/generated/prisma'
+import type { TargetLanguage } from '@prisma/client'
 import { Avatar } from '@/components/game/Avatar'
 
 export default function PlayPage() {

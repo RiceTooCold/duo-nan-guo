@@ -1,10 +1,10 @@
 'use server';
 
 import { prisma } from '@/lib/prisma';
-import { TargetLanguage, MatchStatus, MatchMode } from '@/generated/prisma';
+import { TargetLanguage, MatchStatus, MatchMode } from '@prisma/client';
 import type { GameSession, ClientQuestion } from '@/types/game';
 import type { LiveGameState } from '@/lib/game-engine/server/GameStore';
-import type { MatchPlayer } from '@/generated/prisma';
+import type { MatchPlayer } from '@prisma/client';
 
 /** Simple hash function for answer validation */
 function hashAnswer(answer: string): string {
