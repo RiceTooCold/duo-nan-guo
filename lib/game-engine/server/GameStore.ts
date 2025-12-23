@@ -81,6 +81,7 @@ export interface ClientGameView {
 
     correctAnswer: string | null;
     winnerId: string | null;
+    endTime: number;
 }
 
 // ============================================

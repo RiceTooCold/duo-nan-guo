@@ -249,6 +249,8 @@ import {
     startRound as startGameRound,
     submitAnswer as submitGameRoomAnswer,
     handleTimeout as handleGameTimeout,
+    triggerBotAnswer as performGameRoomBotAnswer,
+    advanceGamePhase as advanceGameRoomPhase,
 } from '@/lib/game-engine/server/GameRoom';
 import { getGameState } from '@/lib/game-engine/server/GameStore';
 
@@ -307,6 +309,37 @@ export async function reportTimeout(matchId: string) {
         return { success: true, state };
     } catch (error) {
         console.error('reportTimeout error:', error);
+        return { success: false, error: (error as Error).message };
+    }
+}
+
+/**
+ * Trigger bot move (client-driven)
+ */
+export async function performBotMove(
+    matchId: string,
+    botPlayerId: string,
+    questionIndex: number,
+    botModel?: string
+) {
+    try {
+        await performGameRoomBotAnswer(matchId, botPlayerId, questionIndex, botModel);
+        return { success: true };
+    } catch (error) {
+        console.error('performBotMove error:', error);
+        return { success: false, error: (error as Error).message };
+    }
+}
+
+/**
+ * Proceed to next phase/question (client-driven)
+ */
+export async function proceedToNextPhase(matchId: string) {
+    try {
+        const state = await advanceGameRoomPhase(matchId);
+        return { success: true, state };
+    } catch (error) {
+        console.error('proceedToNextPhase error:', error);
         return { success: false, error: (error as Error).message };
     }
 }

@@ -9,6 +9,8 @@ import {
     submitServerAnswer,
     reportTimeout,
     getMatch,
+    performBotMove,
+    proceedToNextPhase,
 } from '@/actions/game.server';
 import type { LiveGameState, ClientGameView } from '@/lib/game-engine/server/GameStore';
 import type { ClientQuestion, GameSession } from '@/types/game';
@@ -101,6 +103,7 @@ export function useGameClient(matchId: string): UseGameClientReturn {
             },
             correctAnswer: liveState.correctAnswer,
             winnerId: liveState.winnerId,
+            endTime: liveState.endTime,
         };
     }, [liveState, session, selfPlayerId, opponentPlayerId, timeLeft]);
 
@@ -257,6 +260,42 @@ export function useGameClient(matchId: string): UseGameClientReturn {
             console.error('Submit answer error:', err);
         }
     }, [matchId, selfPlayerId, liveState?.phase]);
+
+    // NEW: Client-driven bot triggering
+    const opponentState = liveState?.playerStates[opponentPlayerId || ''];
+
+    useEffect(() => {
+        if (!liveState || liveState.phase !== GamePhase.PLAYING || !session) return;
+
+        const opponent = session.players.find(p => p.playerId === opponentPlayerId);
+        if (opponent?.isBot && opponentState?.answer === null) {
+            // It's a bot's turn and it hasn't answered yet
+            console.log('🤖 [Client] Triggering bot move for', opponent.playerId);
+            performBotMove(
+                matchId,
+                opponent.playerId,
+                liveState.currentQuestionIndex,
+                opponent.botModel || undefined
+            ).catch(err => console.error('Bot trigger error:', err));
+        }
+    }, [liveState?.phase, liveState?.currentQuestionIndex, session, opponentPlayerId, opponentState?.answer, matchId]);
+
+    // NEW: Client-driven phase transition (RESOLVING -> PLAYING/FINISHED)
+    useEffect(() => {
+        if (!liveState || liveState.phase !== GamePhase.RESOLVING) return;
+
+        // Advance after 2 seconds (matching RESOLVING_DURATION)
+        const advanceTimer = setTimeout(async () => {
+            console.log('➡️ [Client] Advancing to next phase...');
+            try {
+                await proceedToNextPhase(matchId);
+            } catch (err) {
+                console.error('Phase advance error:', err);
+            }
+        }, 2000);
+
+        return () => clearTimeout(advanceTimer);
+    }, [liveState?.phase, liveState?.currentQuestionIndex, matchId]);
 
     // Derived values
     const currentQuestion = session?.questions[liveState?.currentQuestionIndex ?? 0];

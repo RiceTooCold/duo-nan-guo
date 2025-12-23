@@ -23,7 +23,7 @@ import { PrismaClientKnownRequestError } from '@prisma/client/runtime/binary';
 import { calculateScore } from '@/lib/config/game';
 
 const TIME_PER_QUESTION = 15; // seconds
-const RESOLVING_DURATION = 3000; // ms
+const RESOLVING_DURATION = 2000; // ms - time to show correct answer
 
 // Simple in-memory lock to prevent duplicate bot triggers
 const botProcessingLocks = new Set<string>();
@@ -187,11 +187,8 @@ export async function startRound(matchId: string): Promise<LiveGameState> {
     await setGameState(matchId, newState);
     await broadcastState(matchId, newState);
 
-    // Trigger bot answer if there's a bot player
-    const botPlayer = match.players.find(p => p.isBot);
-    if (botPlayer) {
-        triggerBotAnswer(matchId, botPlayer.playerId, state.currentQuestionIndex, botPlayer.botModel || undefined).catch(console.error);
-    }
+    await setGameState(matchId, newState);
+    await broadcastState(matchId, newState);
 
     return newState;
 }
@@ -341,7 +338,8 @@ export async function submitAnswer(
                     console.log(`📡 [State] Match ${matchId.slice(-4)}:`, JSON.stringify(logState));
 
                     if (allAnswered) {
-                        scheduleNextAction(matchId, match.questionIds.length);
+                        // In client-driven model, we don't schedule next action here anymore
+                        // The client will see allAnswered (RESOLVING phase) and initiate the next step after animation
                     }
 
                     return newState;
@@ -456,9 +454,8 @@ export async function handleTimeout(matchId: string): Promise<LiveGameState> {
                         data: { liveState: newState as unknown as object },
                     });
 
-                    // 5. Broadcast and schedule next action
+                    // 5. Broadcast (client will trigger next step after seeing RESOLVING phase)
                     await broadcastState(matchId, newState);
-                    scheduleNextAction(matchId, match.questionIds.length);
 
                     return newState;
                 });
@@ -484,26 +481,30 @@ export async function handleTimeout(matchId: string): Promise<LiveGameState> {
 }
 
 /**
- * Move to next question or finish game
+ * Force advance to next phase (triggered by client after RESOLVING duration)
  */
-async function scheduleNextAction(matchId: string, totalQuestions: number) {
-    console.log(`⏰ [Schedule] Next action for match ${matchId.slice(-4)} in ${RESOLVING_DURATION}ms`);
-    setTimeout(async () => {
-        try {
-            const state = await getGameState(matchId);
-            if (!state) return;
+export async function advanceGamePhase(matchId: string): Promise<LiveGameState> {
+    const state = await getGameState(matchId);
+    if (!state || state.phase !== GamePhase.RESOLVING) {
+        throw new Error('Can only advance from RESOLVING phase');
+    }
 
-            const isLastQuestion = state.currentQuestionIndex >= totalQuestions - 1;
+    const match = await prisma.match.findUnique({
+        where: { id: matchId },
+        select: { questionIds: true },
+    });
+    if (!match) throw new Error('Match not found');
 
-            if (isLastQuestion) {
-                await finishGame(matchId);
-            } else {
-                await nextQuestion(matchId);
-            }
-        } catch (error) {
-            console.error('Error in scheduleNextAction:', error);
-        }
-    }, RESOLVING_DURATION);
+    const isLastQuestion = state.currentQuestionIndex >= match.questionIds.length - 1;
+
+    if (isLastQuestion) {
+        await finishGame(matchId);
+    } else {
+        await nextQuestion(matchId);
+    }
+
+    const newState = await getGameState(matchId);
+    return newState!;
 }
 
 /**
