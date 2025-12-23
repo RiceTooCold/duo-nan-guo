@@ -10,7 +10,6 @@ import { createWaitingMatch, getBotUsers, type BotUserInfo } from '@/actions/gam
 import { gameLanguages, questionCounts, levelToRank, type GameLanguageConfig } from '@/lib/config/game'
 import type { TargetLanguage } from '@/generated/prisma'
 import { Avatar } from '@/components/game/Avatar'
-import { getGameLanguage } from '@/lib/config/game'
 
 export default function PlayPage() {
     const router = useRouter()
@@ -249,7 +248,7 @@ export default function PlayPage() {
                                 </p>
                                 <span className="text-[#64748b]">－</span>
                                 <p className="text-sm text-[#64748b]">
-                                    {opponent === 'bot' ? 'PvE 對戰' : 'PvP 對戰'} [{opponent === 'bot' && botUsers.find((bot) => bot.id === selectedBotId)?.name.replace(' Bot', '')}]
+                                    {opponent === 'bot' ? `PvE 對戰 [${botUsers.find((bot) => bot.id === selectedBotId)?.name}]` : 'PvP 對戰'}
                                 </p>
                             </div>
                         </div>

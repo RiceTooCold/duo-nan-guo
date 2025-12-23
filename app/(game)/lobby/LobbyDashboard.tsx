@@ -127,17 +127,17 @@ export default function LobbyDashboard({ stats, session }: LobbyDashboardProps) 
                     />
                     <StatBox
                         icon={Flame}
-                        label="連勝"
+                        label="連勝紀錄"
                         value={stats.currentStreak}
                         delay={0.3}
                         highlight={stats.currentStreak > 2}
                     />
                     <StatBox
                         icon={Zap}
-                        label="速度"
+                        label="答題速度"
                         value={`${stats.avgSpeed}s`}
                         delay={0.4}
-                        highlight={stats.avgSpeed < 2}
+                        highlight={stats.avgSpeed < 3}
                     />
                 </div>
             </section>

@@ -156,56 +156,44 @@ export interface UserDashboardStats {
 
 /**
  * Get aggregated stats for the user dashboard
+ * All stats are calculated on-the-fly from Match/AnswerRecord data
  */
 export async function getUserDashboardStats(userId: string): Promise<UserDashboardStats> {
-    const user = await prisma.user.findUnique({
-        where: { id: userId },
-        select: { stats: true }
-    });
-
-    const stats = user?.stats;
-
-    // 1. Basic Stats (from DB or fallback)
-    let totalMatches = stats?.totalMatches || 0;
-    let totalWins = stats?.wins || 0;
-    let totalXp = stats?.totalXp || 0;
-
-    // If no stored stats, fallback to calculation (backward compatibility)
-    if (!stats) {
-        totalMatches = await prisma.match.count({
-            where: {
-                status: MatchStatus.finished,
-                players: { some: { userId: userId } }
-            }
-        });
-        totalWins = await prisma.match.count({
-            where: {
-                status: MatchStatus.finished,
-                winnerId: userId
-            }
-        });
-        // Approx XP for legacy: 50 per match
-        totalXp = totalMatches * 50;
-    }
-
-    // 2. Win Rate
-    const winRate = totalMatches > 0 ? Math.round((totalWins / totalMatches) * 100) : 0;
-
-    // 3. Level Calculation
-    // Level 1 = 0-99 XP
-    // Level 2 = 100-199 XP
-    const level = Math.floor(totalXp / 100) + 1;
-
-    // 4. Streak & Last Match (Still need match history)
+    // 1. Get all finished matches for this user
     const matches = await prisma.match.findMany({
         where: {
             status: MatchStatus.finished,
             players: { some: { userId: userId } }
         },
         orderBy: { endedAt: 'desc' },
-        take: 20
+        select: {
+            id: true,
+            winnerId: true,
+            isTie: true,
+            players: true,
+            targetLanguage: true,
+            rank: true,
+            endedAt: true,
+            createdAt: true,
+        }
     });
 
+    // 2. Calculate basic stats
+    const totalMatches = matches.length;
+    const wins = matches.filter(m => m.winnerId === userId).length;
+    const ties = matches.filter(m => m.isTie).length;
+    const losses = totalMatches - wins - ties;
+
+    // 3. Calculate XP (win=100, tie=50, loss=20)
+    const totalXp = (wins * 100) + (ties * 50) + (losses * 20);
+
+    // 4. Win Rate
+    const winRate = totalMatches > 0 ? Math.round((wins / totalMatches) * 100) : 0;
+
+    // 5. Level Calculation (Level 1 = 0-99 XP, Level 2 = 100-199 XP, etc)
+    const level = Math.floor(totalXp / 100) + 1;
+
+    // 6. Current Streak (count consecutive wins from most recent)
     let currentStreak = 0;
     for (const m of matches) {
         if (m.winnerId === userId) {
@@ -215,6 +203,7 @@ export async function getUserDashboardStats(userId: string): Promise<UserDashboa
         }
     }
 
+    // 7. Last Match
     let lastMatch: MatchHistoryItem | null = null;
     if (matches.length > 0) {
         const m = matches[0];
@@ -229,14 +218,17 @@ export async function getUserDashboardStats(userId: string): Promise<UserDashboa
             playerScore: userPlayer?.finalScore || 0,
             opponentScore: opponent?.finalScore || 0,
             isWin: m.winnerId === userId,
-            isTie: m.winnerId === null,
+            isTie: m.isTie,
             opponentName: opponent?.name || 'Unknown',
         };
     }
 
-    // 5. Calculate Average Speed (from last 50 answers)
+    // 8. Calculate Average Speed (from last 50 valid answers, excluding timeouts)
     const recentAnswers = await prisma.answerRecord.findMany({
-        where: { userId: userId },
+        where: {
+            userId: userId,
+            responseTimeMs: { gt: 0 }  // Exclude timeout records (responseTimeMs = 0)
+        },
         orderBy: { createdAt: 'desc' },
         take: 50,
         select: { responseTimeMs: true }

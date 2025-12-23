@@ -38,6 +38,7 @@ export interface PlayerGameState {
     maxStreak: number;
     answer: string | null;
     isCorrect: boolean | null;
+    lastScoreChange: number;  // Score delta from last answer (for animation)
 }
 
 // ============================================
@@ -61,6 +62,7 @@ export interface ClientGameView {
         maxStreak: number;
         answer: string | null;
         isCorrect: boolean | null;
+        lastScoreChange: number;
     };
 
     // Opponent state
@@ -74,6 +76,7 @@ export interface ClientGameView {
         maxStreak: number;
         answer: string | null;
         isCorrect: boolean | null;
+        lastScoreChange: number;
     };
 
     correctAnswer: string | null;
@@ -128,5 +131,6 @@ export function createInitialPlayerState(): PlayerGameState {
         maxStreak: 0,
         answer: null,
         isCorrect: null,
+        lastScoreChange: 0,
     };
 }

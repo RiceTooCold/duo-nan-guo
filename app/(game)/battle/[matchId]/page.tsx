@@ -12,13 +12,8 @@ import { useGameClient } from '@/lib/game-engine/useGameClient'
 import { GamePhase, type ClientQuestion } from '@/types/game'
 import { rankToLevel } from '@/lib/config/game'
 import { TargetLanguage } from '@/generated/prisma'
+import { getLanguageConfig } from '@/lib/config/factory'
 
-const languageLabels: Record<string, string> = {
-    JP: '日文',
-    EN: '英文',
-    KR: '韓文',
-    CN: '中文',
-}
 
 function BattleContent() {
     const params = useParams<{ matchId: string }>()
@@ -150,7 +145,7 @@ function BattleContent() {
             <AnimatePresence>
                 {showIntro && (
                     <BattleIntro
-                        language={languageLabels[langParam as string] || (langParam as string)}
+                        language={getLanguageConfig(langParam).name}
                         level={rankToLevel(langParam as TargetLanguage, rankParam as number)}
                         playerAvatar={selfState?.avatar}
                         opponentAvatar={opponentState?.avatar}
@@ -167,7 +162,7 @@ function BattleContent() {
                     className="text-2xl font-bold text-center text-[#333]"
                     animate={{ opacity: 1, y: 0 }}
                 >
-                    {languageLabels[langParam as string] || langParam} {rankToLevel(langParam as TargetLanguage, rankParam)}
+                    {getLanguageConfig(langParam).examName} {rankToLevel(langParam as TargetLanguage, rankParam)}
                 </motion.h1>
             </header>
 
@@ -281,7 +276,11 @@ function BattleContent() {
                     </div>
 
                     <div className="flex flex-col items-start gap-1">
-                        <BatteryScore score={selfState?.score || 0} variant="default" />
+                        <BatteryScore
+                            score={selfState?.score || 0}
+                            variant="default"
+                            lastScoreChange={view.self.lastScoreChange}
+                        />
 
                     </div>
                 </motion.div>
@@ -318,7 +317,11 @@ function BattleContent() {
                     </div>
 
                     <div className="flex flex-col items-end gap-1">
-                        <BatteryScore score={opponentState?.score || 0} variant="opponent" />
+                        <BatteryScore
+                            score={opponentState?.score || 0}
+                            variant="opponent"
+                            lastScoreChange={view.opponent.lastScoreChange}
+                        />
                     </div>
                 </motion.div>
             </section>

@@ -140,7 +140,7 @@ Team ownership is defined in `.github/CODEOWNERS`:
 |----------|-----------|
 | LLM bots stored as Users | Enables stat tracking and profile display |
 | Rule bots have no User record | No analytical value (behavior is deterministic) |
-| UserStats embedded in User | Fast profile reads, updated after each match |
+| User stats (on-the-fly) | Calculated from Match/AnswerRecord, always consistent |
 | MatchPlayer embedded in Match | Small array (2-8), avoids joins |
 | AnswerRecord as separate collection | High volume, needs independent queries |
 

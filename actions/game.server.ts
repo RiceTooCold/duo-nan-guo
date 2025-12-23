@@ -227,7 +227,7 @@ export async function createMatch(
             targetLanguage: config.lang,
             rank: config.rank,
             questionCount: questionCount,
-            timePerQuestion: 10,
+            timePerQuestion: 15,
             status: MatchStatus.playing,
             questionIds: selectedIds,
             players: players,
@@ -354,16 +354,18 @@ export async function getMatchResult(matchId: string): Promise<GameResult | null
             select: {
                 userId: true,
                 responseTimeMs: true,
+                isCorrect: true,
             },
         });
 
-        // Group response times by userId
-        const responseTimesByUser = new Map<string, number[]>();
+        // Group answer data by userId
+        const answerDataByUser = new Map<string, { responseTimes: number[], correctCount: number }>();
         for (const record of answerRecords) {
             if (!record.userId) continue; // Skip if userId is null
-            const times = responseTimesByUser.get(record.userId) || [];
-            times.push(record.responseTimeMs);
-            responseTimesByUser.set(record.userId, times);
+            const data = answerDataByUser.get(record.userId) || { responseTimes: [], correctCount: 0 };
+            data.responseTimes.push(record.responseTimeMs);
+            if (record.isCorrect) data.correctCount++;
+            answerDataByUser.set(record.userId, data);
         }
 
         // Find self player based on session userId, fallback to player_1 for logged-out users
@@ -383,7 +385,9 @@ export async function getMatchResult(matchId: string): Promise<GameResult | null
 
         // Calculate stats
         const createPlayerResult = (player: typeof selfPlayer): PlayerResult => {
-            const correctAnswers = Math.floor(player.finalScore / 10);
+            // Get correct answers from AnswerRecord (not from score)
+            const answerData = player.userId ? answerDataByUser.get(player.userId) : null;
+            const correctAnswers = answerData?.correctCount || 0;
 
             // Retrieve maxStreak from liveState if available
             let maxStreak = 0;
@@ -392,7 +396,7 @@ export async function getMatchResult(matchId: string): Promise<GameResult | null
             }
 
             // Calculate average response time
-            const responseTimes = player.userId ? responseTimesByUser.get(player.userId) || [] : [];
+            const responseTimes = answerData?.responseTimes || [];
             const avgResponseTimeMs = responseTimes.length > 0
                 ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length
                 : 0;
@@ -533,7 +537,7 @@ export async function createWaitingMatch(
             targetLanguage: config.targetLanguage,
             rank: config.rank,
             questionCount: questionCount,
-            timePerQuestion: 10,
+            timePerQuestion: 15,
             status: MatchStatus.waiting,
             questionIds: selectedIds,
             players: players,

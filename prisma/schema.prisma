@@ -141,8 +141,8 @@ model User {
   isBot         Boolean    @default(false)
   botModel      String?    // e.g., "gemini-2.5-flash", "gpt-4o"
   
-  // Denormalized stats (updated after each match)
-  stats         UserStats?
+  // Note: User stats are now calculated on-the-fly from Match/AnswerRecord
+  // See: actions/user.server.ts -> getUserDashboardStats()
   
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
@@ -167,17 +167,6 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
-}
-
-
-
-type UserStats {
-  totalMatches   Int   @default(0)
-  wins           Int   @default(0)
-  losses         Int   @default(0)
-  ties           Int   @default(0)
-  correctRate    Float @default(0)
-  totalXp        Int   @default(0)
 }
 
 // ============================================
