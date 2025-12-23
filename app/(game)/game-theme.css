@@ -1,0 +1,393 @@
+/* ===== DunNanGuo Game Theme ===== */
+/* 遊戲專用樣式 - 不影響後台 */
+
+/* Game-specific CSS Variables (scoped to .game-app) */
+.game-app {
+  /* Core Colors - 淺藍色系 */
+  --game-bg: #ffffff;
+  --game-fg: #333333;
+
+  /* Primary - 淺藍色 */
+  --game-primary: #A9C4EB;
+  --game-primary-hover: #8FB3E3;
+  --game-primary-fg: #333333;
+
+  /* Secondary - 更淺的藍 */
+  --game-secondary: #D5E3F7;
+  --game-secondary-hover: #C4D8F3;
+  --game-secondary-fg: #333333;
+
+  /* Accent - 深藍色按鈕 */
+  --game-accent: #5B8BD4;
+  --game-accent-hover: #4A7BC4;
+  --game-accent-fg: #ffffff;
+
+  /* UI Elements */
+  --game-muted: #F5F8FC;
+  --game-muted-fg: #64748b;
+  --game-border: #D5E3F7;
+  --game-radius: 1rem;
+
+  /* Status colors */
+  --game-success: #22c55e;
+  --game-success-light: #dcfce7;
+  --game-warning: #f59e0b;
+  --game-warning-light: #fef3c7;
+  --game-error: #ef4444;
+  --game-error-light: #fee2e2;
+  --game-info: #3b82f6;
+  --game-info-light: #dbeafe;
+
+  /* Apply base styles */
+  background: var(--game-bg);
+  color: var(--game-fg);
+  font-family: 'Nunito', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ===== Mobile Container ===== */
+.game-mobile-container {
+  max-width: 480px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* ===== Card Styles ===== */
+.game-card {
+  background: var(--game-bg);
+  border-radius: calc(var(--game-radius) + 12px);
+  border: 2px solid var(--game-border);
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+}
+
+.game-card-primary {
+  background: var(--game-primary);
+  border-radius: calc(var(--game-radius) + 12px);
+  border: none;
+}
+
+.game-card-secondary {
+  background: var(--game-secondary);
+  border-radius: calc(var(--game-radius) + 12px);
+  border: none;
+}
+
+/* ===== Button Styles ===== */
+.game-btn {
+  border-radius: calc(var(--game-radius) + 8px);
+  font-weight: 600;
+  padding: 0.75rem 1.5rem;
+  transition: all 0.2s ease;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border: none;
+}
+
+.game-btn-primary {
+  background: var(--game-accent);
+  color: var(--game-accent-fg);
+}
+
+.game-btn-primary:hover {
+  background: var(--game-accent-hover);
+  transform: translateY(-1px);
+}
+
+.game-btn-primary:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.game-btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.game-btn-secondary {
+  background: var(--game-secondary);
+  color: var(--game-secondary-fg);
+}
+
+.game-btn-secondary:hover {
+  background: var(--game-secondary-hover);
+}
+
+/* ===== Option Card (Game) ===== */
+.game-option-card {
+  background: var(--game-secondary);
+  border-radius: calc(var(--game-radius) + 8px);
+  padding: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border: 2px solid transparent;
+}
+
+.game-option-card:hover {
+  background: var(--game-primary);
+  transform: scale(1.02);
+}
+
+.game-option-card:active {
+  transform: scale(0.98);
+}
+
+.game-option-card.selected {
+  border-color: var(--game-accent);
+  background: var(--game-primary);
+}
+
+.game-option-card.correct {
+  background: var(--game-success-light);
+  border-color: var(--game-success);
+}
+
+.game-option-card.incorrect {
+  background: var(--game-error-light);
+  border-color: var(--game-error);
+}
+
+/* ===== Score Bubble ===== */
+.game-score-bubble {
+  background: var(--game-secondary);
+  border-radius: calc(var(--game-radius) + 20px);
+  padding: 0.5rem 1.25rem;
+  font-weight: 700;
+  position: relative;
+}
+
+.game-score-bubble::before {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: var(--game-secondary);
+  transform: rotate(45deg);
+}
+
+.game-score-bubble.left::before {
+  left: -6px;
+  top: 50%;
+  margin-top: -6px;
+}
+
+.game-score-bubble.right::before {
+  right: -6px;
+  top: 50%;
+  margin-top: -6px;
+}
+
+/* ===== Input Styles ===== */
+.game-input {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border-radius: calc(var(--game-radius) + 8px);
+  border: 2px solid var(--game-primary);
+  background: var(--game-bg);
+  color: var(--game-fg);
+  font-size: 1rem;
+  transition: all 0.2s ease;
+}
+
+.game-input:focus {
+  outline: none;
+  border-color: var(--game-accent);
+  box-shadow: 0 0 0 3px rgba(91, 139, 212, 0.2);
+}
+
+.game-input::placeholder {
+  color: var(--game-muted-fg);
+}
+
+/* ===== Animations ===== */
+@keyframes game-float {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+@keyframes game-pulse-soft {
+
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes game-bounce-in {
+  0% {
+    transform: scale(0);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.1);
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes game-slide-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes game-countdown {
+  0% {
+    transform: scale(0.5);
+    opacity: 0;
+  }
+
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+
+.game-animate-float {
+  animation: game-float 3s ease-in-out infinite;
+}
+
+.game-animate-pulse-soft {
+  animation: game-pulse-soft 2s ease-in-out infinite;
+}
+
+.game-animate-bounce-in {
+  animation: game-bounce-in 0.5s ease-out forwards;
+}
+
+.game-animate-slide-up {
+  animation: game-slide-up 0.4s ease-out forwards;
+}
+
+.game-animate-countdown {
+  animation: game-countdown 1s ease-out forwards;
+}
+
+/* ===== Utility Classes ===== */
+.game-text-primary {
+  color: var(--game-primary);
+}
+
+.game-text-accent {
+  color: var(--game-accent);
+}
+
+.game-text-muted {
+  color: var(--game-muted-fg);
+}
+
+.game-text-success {
+  color: var(--game-success);
+}
+
+.game-text-error {
+  color: var(--game-error);
+}
+
+.game-text-warning {
+  color: var(--game-warning);
+}
+
+.game-text-info {
+  color: var(--game-info);
+}
+
+.game-bg-primary {
+  background: var(--game-primary);
+}
+
+.game-bg-secondary {
+  background: var(--game-secondary);
+}
+
+.game-bg-accent {
+  background: var(--game-accent);
+}
+
+.game-bg-muted {
+  background: var(--game-muted);
+}
+
+.game-bg-success-light {
+  background: var(--game-success-light);
+}
+
+.game-bg-error-light {
+  background: var(--game-error-light);
+}
+
+.game-bg-warning-light {
+  background: var(--game-warning-light);
+}
+
+.game-bg-info-light {
+  background: var(--game-info-light);
+}
+
+.game-border-primary {
+  border-color: var(--game-primary);
+}
+
+.game-border-accent {
+  border-color: var(--game-accent);
+}
+
+.game-border-border {
+  border-color: var(--game-border);
+}
+
+/* ===== Scrollbar (Game scoped) ===== */
+.game-app::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.game-app::-webkit-scrollbar-track {
+  background: var(--game-muted);
+  border-radius: 3px;
+}
+
+.game-app::-webkit-scrollbar-thumb {
+  background: var(--game-primary);
+  border-radius: 3px;
+}
+
+.game-app::-webkit-scrollbar-thumb:hover {
+  background: var(--game-primary-hover);
+}
