@@ -85,6 +85,7 @@ export const questionCounts = [5, 10, 20] as const
 // Scoring Configuration
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const TIME_PER_QUESTION = 20; // seconds
 export const SCORING_CONFIG = {
     /** Base score for correct answer */
     baseScore: 100,
@@ -92,14 +93,14 @@ export const SCORING_CONFIG = {
     /** Maximum speed bonus points */
     speedBonusMax: 50,
 
-    /** Speed bonus window as ratio of time limit (0.7 = 70%) */
-    speedBonusWindowRatio: 0.7,
+    /** Speed bonus window as ratio of time limit (0.85 = 85%, more lenient for Vercel latency) */
+    speedBonusWindowRatio: 0.85,
 
     /** Combo multipliers for streak (index = streak count, max at 5+) */
     comboMultipliers: [1.0, 1.1, 1.2, 1.3, 1.4, 1.5] as const,
 
     /** Time per question in milliseconds */
-    timePerQuestionMs: 15000,
+    timePerQuestionMs: 20000,
 } as const
 
 /**

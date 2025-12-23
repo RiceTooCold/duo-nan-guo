@@ -22,7 +22,7 @@ import { getBotAnswer } from '@/actions/bot.server';
 import { PrismaClientKnownRequestError } from '@prisma/client/runtime/binary';
 import { calculateScore } from '@/lib/config/game';
 
-const TIME_PER_QUESTION = 15; // seconds
+const TIME_PER_QUESTION = 20; // seconds
 const RESOLVING_DURATION = 2000; // ms - time to show correct answer
 
 // Simple in-memory lock to prevent duplicate bot triggers

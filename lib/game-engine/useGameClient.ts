@@ -15,6 +15,24 @@ import {
 import type { LiveGameState, ClientGameView } from '@/lib/game-engine/server/GameStore';
 import type { ClientQuestion, GameSession } from '@/types/game';
 
+/** Client-side hash function (must match server) */
+function hashAnswer(answer: string): string {
+    let hash = 0;
+    for (let i = 0; i < answer.length; i++) {
+        const char = answer.charCodeAt(i);
+        hash = ((hash << 5) - hash) + char;
+        hash = hash & hash;
+    }
+    return hash.toString(36);
+}
+
+/** Optimistic answer state for instant feedback */
+interface OptimisticAnswer {
+    answer: string;
+    isCorrect: boolean;
+    questionIndex: number;
+}
+
 interface UseGameClientReturn {
     // Transformed view (self/opponent perspective)
     view: ClientGameView | null;
@@ -44,6 +62,9 @@ export function useGameClient(matchId: string): UseGameClientReturn {
     const timerRef = useRef<NodeJS.Timeout | null>(null);
     const initializedRef = useRef(false);
     const timeoutReportedRef = useRef(false);
+
+    // Optimistic answer for instant feedback
+    const [optimisticAnswer, setOptimisticAnswer] = useState<OptimisticAnswer | null>(null);
 
     // Determine selfPlayerId from session + game data
     const selfPlayerId = useMemo(() => {
@@ -85,8 +106,13 @@ export function useGameClient(matchId: string): UseGameClientReturn {
                 score: selfState.score,
                 streak: selfState.streak,
                 maxStreak: selfState.maxStreak,
-                answer: selfState.answer,
-                isCorrect: selfState.isCorrect,
+                // Use optimistic answer if available and matches current question
+                answer: (optimisticAnswer?.questionIndex === liveState.currentQuestionIndex)
+                    ? optimisticAnswer.answer
+                    : selfState.answer,
+                isCorrect: (optimisticAnswer?.questionIndex === liveState.currentQuestionIndex)
+                    ? optimisticAnswer.isCorrect
+                    : selfState.isCorrect,
                 lastScoreChange: selfState.lastScoreChange ?? 0,
             },
             opponent: {
@@ -250,16 +276,33 @@ export function useGameClient(matchId: string): UseGameClientReturn {
         }
     }, [timeLeft, liveState?.phase, handleTimeout, selfPlayerId]);
 
-    // Submit answer (use actual playerId, not 'self')
+    // Submit answer with instant feedback via hash comparison
     const handleAnswer = useCallback(async (answer: string) => {
-        if (!liveState || liveState.phase !== GamePhase.PLAYING) return;
+        if (!liveState || liveState.phase !== GamePhase.PLAYING || !session) return;
 
-        try {
-            await submitServerAnswer(matchId, selfPlayerId, answer);
-        } catch (err) {
+        // Get current question
+        const currentQ = session.questions[liveState.currentQuestionIndex];
+        if (!currentQ) return;
+
+        // 1. Instant verification using hash (0ms delay!)
+        const answerHash = hashAnswer(answer);
+        const correctHash = session.correctAnswerHashes[currentQ.id];
+        const isCorrect = answerHash === correctHash;
+
+        // 2. Optimistic update for instant UI feedback
+        setOptimisticAnswer({
+            answer,
+            isCorrect,
+            questionIndex: liveState.currentQuestionIndex,
+        });
+
+        console.log(`⚡ [Instant] Answer ${answer} is ${isCorrect ? 'correct ✓' : 'wrong ✗'}`);
+
+        // 3. Submit to server in background (for scoring)
+        submitServerAnswer(matchId, selfPlayerId, answer).catch(err => {
             console.error('Submit answer error:', err);
-        }
-    }, [matchId, selfPlayerId, liveState?.phase]);
+        });
+    }, [matchId, selfPlayerId, liveState?.phase, liveState?.currentQuestionIndex, session]);
 
     // NEW: Client-driven bot triggering
     const opponentState = liveState?.playerStates[opponentPlayerId || ''];
